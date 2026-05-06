@@ -44,6 +44,9 @@ public class SupplierMapping {
     @Column(nullable = false)
     private boolean ignored = false;
 
+    @Column(name = "message_count", nullable = false)
+    private int messageCount = 0;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

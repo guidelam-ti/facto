@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Fournisseurs</title>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-building text-primary me-2"></i>Validation des fournisseurs
+        </h1>
+        <a th:href="@{/scan}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Retour au scan
+        </a>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${info}" class="alert alert-info" th:text="${info}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <p class="text-muted">
+        Pour chaque expéditeur détecté lors du dernier scan, choisis :
+        <em>mapper vers un fournisseur existant</em>, <em>créer un nouveau fournisseur</em>, ou <em>ignorer</em>.
+        Les expéditeurs laissés sur « pas encore » seront re-proposés au prochain affichage.
+    </p>
+
+    <div class="row g-2 mb-3">
+        <div class="col-sm-6">
+            <div class="card border-warning">
+                <div class="card-body py-2 d-flex align-items-center">
+                    <i class="bi bi-hourglass-split text-warning fs-5 me-2"></i>
+                    <span class="fs-5 fw-semibold me-2" th:text="${#lists.size(pendingMappings)}">0</span>
+                    <span class="text-muted">à valider</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="card border-success">
+                <div class="card-body py-2 d-flex align-items-center">
+                    <i class="bi bi-check2-circle text-success fs-5 me-2"></i>
+                    <span class="fs-5 fw-semibold me-2" th:text="${#lists.size(decidedMappings)}">0</span>
+                    <span class="text-muted">déjà décidés</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(decidedMappings)}" class="accordion mb-4" id="decidedAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#decidedCollapse">
+                    <i class="bi bi-check2-circle text-success me-2"></i>
+                    Voir les
+                    <span class="badge text-bg-success mx-2" th:text="${#lists.size(decidedMappings)}">0</span>
+                    expéditeur(s) déjà décidé(s)
+                </button>
+            </h2>
+            <div id="decidedCollapse" class="accordion-collapse collapse" data-bs-parent="#decidedAccordion">
+                <div class="accordion-body p-0">
+                    <div class="table-responsive">
+                        <table class="table mb-0 align-middle">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Expéditeur</th>
+                                <th class="text-end">Messages</th>
+                                <th>Mapping</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="m : ${decidedMappings}">
+                                <td class="font-monospace small" th:text="${m.emailAddress}">…</td>
+                                <td class="text-end">
+                                    <span class="badge text-bg-light text-dark" th:text="${m.messageCount}">0</span>
+                                </td>
+                                <td>
+                                    <span th:if="${m.ignored}" class="badge text-bg-secondary">
+                                        <i class="bi bi-slash-circle me-1"></i>Ignoré
+                                    </span>
+                                    <span th:if="${m.supplier != null}" class="badge text-bg-success">
+                                        <i class="bi bi-building me-1"></i>
+                                        <span th:text="${m.supplier.displayName}">Supplier</span>
+                                    </span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="h4 mt-4">
+        <i class="bi bi-hourglass-split text-warning me-1"></i>
+        À valider
+    </h2>
+
+    <div th:if="${#lists.isEmpty(pendingMappings)}" class="alert alert-success">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        Tous les expéditeurs détectés sont déjà mappés ou ignorés. Lance un nouveau
+        <a th:href="@{/scan}" class="alert-link">scan</a> pour rafraîchir.
+    </div>
+
+    <form th:unless="${#lists.isEmpty(pendingMappings)}"
+          method="post" th:action="@{/suppliers/save}" th:object="${decisionForm}">
+
+        <div class="card shadow-sm mb-3">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                    <tr>
+                        <th scope="col">Expéditeur</th>
+                        <th scope="col" class="text-end">Messages</th>
+                        <th scope="col" style="min-width: 220px;">Action</th>
+                        <th scope="col" style="min-width: 220px;">Nouveau fournisseur (si <em>créer</em>)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="mapping, iter : ${pendingMappings}">
+                        <td class="font-monospace small" th:text="${mapping.emailAddress}">email@example.com</td>
+                        <td class="text-end">
+                            <span class="badge text-bg-info" th:text="${mapping.messageCount}">0</span>
+                        </td>
+                        <td>
+                            <input type="hidden"
+                                   th:name="|decisions[${iter.index}].mappingId|"
+                                   th:value="${mapping.id}">
+                            <select th:name="|decisions[${iter.index}].action|"
+                                    class="form-select form-select-sm action-select">
+                                <option value="">— Pas encore —</option>
+                                <option value="ignore">📁 Ignorer cet expéditeur</option>
+                                <optgroup th:if="${!#lists.isEmpty(allSuppliers)}" label="Mapper vers un fournisseur existant">
+                                    <option th:each="s : ${allSuppliers}"
+                                            th:value="${s.id}"
+                                            th:text="${s.displayName}">…</option>
+                                </optgroup>
+                                <option value="create">➕ Créer un nouveau fournisseur</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text"
+                                   th:name="|decisions[${iter.index}].newSupplierName|"
+                                   class="form-control form-control-sm new-name-input"
+                                   placeholder="ex : Bell, Hydro-Québec…"
+                                   disabled>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>Enregistrer les décisions
+        </button>
+    </form>
+
+    <script>
+        (function () {
+            function syncRow(selectEl) {
+                const row = selectEl.closest('tr');
+                if (!row) return;
+                const input = row.querySelector('.new-name-input');
+                if (!input) return;
+                if (selectEl.value === 'create') {
+                    input.disabled = false;
+                    input.removeAttribute('disabled');
+                    input.required = true;
+                    input.focus();
+                } else {
+                    input.disabled = true;
+                    input.setAttribute('disabled', 'disabled');
+                    input.required = false;
+                    input.value = '';
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                const selects = document.querySelectorAll('select.action-select');
+                selects.forEach(function (s) {
+                    s.addEventListener('change', function () {
+                        syncRow(s);
+                    });
+                });
+            });
+        })();
+    </script>
+
+</section>
+</body>
+</html>

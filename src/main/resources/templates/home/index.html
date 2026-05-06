@@ -46,38 +46,42 @@
             </a>
         </div>
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="bi bi-search text-secondary fs-4 me-2"></i>
-                        <h5 class="card-title mb-0">2. Scan</h5>
+            <a th:href="@{/scan}" href="/scan" class="text-decoration-none text-reset">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-search text-primary fs-4 me-2"></i>
+                            <h5 class="card-title mb-0">2. Scan</h5>
+                        </div>
+                        <p class="card-text text-muted small mb-0">
+                            Inspecter ta boîte de réception et regrouper les emails
+                            avec pièces jointes PDF par expéditeur.
+                        </p>
                     </div>
-                    <p class="card-text text-muted small mb-0">
-                        Inspecter ta boîte de réception et regrouper les emails
-                        avec pièces jointes PDF par expéditeur.
-                    </p>
+                    <div class="card-footer bg-transparent border-0 text-primary small">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Lancer un scan
+                    </div>
                 </div>
-                <div class="card-footer bg-transparent border-0 text-muted small">
-                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape E
-                </div>
-            </div>
+            </a>
         </div>
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="bi bi-building text-secondary fs-4 me-2"></i>
-                        <h5 class="card-title mb-0">3. Fournisseurs</h5>
+            <a th:href="@{/suppliers}" href="/suppliers" class="text-decoration-none text-reset">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-building text-primary fs-4 me-2"></i>
+                            <h5 class="card-title mb-0">3. Fournisseurs</h5>
+                        </div>
+                        <p class="card-text text-muted small mb-0">
+                            Associer chaque adresse expéditeur à un fournisseur canonique
+                            (ou marquer comme à ignorer).
+                        </p>
                     </div>
-                    <p class="card-text text-muted small mb-0">
-                        Associer chaque adresse expéditeur à un fournisseur canonique
-                        (ou marquer comme à ignorer).
-                    </p>
+                    <div class="card-footer bg-transparent border-0 text-primary small">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Mapper les expéditeurs
+                    </div>
                 </div>
-                <div class="card-footer bg-transparent border-0 text-muted small">
-                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape E
-                </div>
-            </div>
+            </a>
         </div>
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 shadow-sm">
