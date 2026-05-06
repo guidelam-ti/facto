@@ -35,6 +35,16 @@ public class SetupController {
         return authService.credentialsConfigured();
     }
 
+    @ModelAttribute("driveFolderId")
+    public String driveFolderId() {
+        return settings.getOrDefault(AppSettingKeys.DRIVE_ROOT_FOLDER_ID, "");
+    }
+
+    @ModelAttribute("driveFolderName")
+    public String driveFolderName() {
+        return settings.getOrDefault(AppSettingKeys.DRIVE_ROOT_FOLDER_NAME, "");
+    }
+
     @GetMapping
     public String index(Model model) {
         if (!model.containsAttribute("form")) {

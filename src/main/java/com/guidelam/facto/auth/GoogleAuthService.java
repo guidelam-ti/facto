@@ -25,6 +25,7 @@ public class GoogleAuthService {
 
     public static final List<String> SCOPES = List.of(
             GmailScopes.GMAIL_READONLY,
+            DriveScopes.DRIVE_METADATA_READONLY,
             DriveScopes.DRIVE_FILE
     );
 

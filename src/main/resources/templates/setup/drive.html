@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Choix du dossier Drive</title>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-folder2-open text-primary me-2"></i>Choix du dossier Drive racine
+        </h1>
+        <a th:href="@{/setup}" href="/setup" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Retour à la configuration
+        </a>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success" role="alert" th:text="${success}">Succès</div>
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="${error}">Erreur</div>
+
+    <div th:if="${currentFolderId != null and !#strings.isEmpty(currentFolderId)}"
+         class="alert alert-info d-flex align-items-center" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <div class="flex-grow-1">
+            <strong>Dossier actuel :</strong>
+            <span th:text="${currentFolderName}">nom</span>
+            <span class="text-muted small ms-2">(ID : <code th:text="${currentFolderId}">id</code>)</span>
+        </div>
+    </div>
+
+    <p class="text-muted small">
+        L'app crée à l'intérieur de ce dossier la hiérarchie <code>année/MM-mois/</code>
+        et y archive les PDFs de factures. Limite : 100 dossiers retournés — affine la recherche
+        si tu n'en vois pas assez.
+    </p>
+
+    <form method="get" th:action="@{/setup/drive}" class="mb-4">
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" name="q" th:value="${query}"
+                   class="form-control"
+                   placeholder="Rechercher par nom (ex : factures, comptabilité, 2024)…"
+                   autocomplete="off">
+            <button type="submit" class="btn btn-primary">Rechercher</button>
+            <a th:if="${query != null and !#strings.isEmpty(query)}"
+               th:href="@{/setup/drive}" href="/setup/drive"
+               class="btn btn-outline-secondary">Effacer</a>
+        </div>
+    </form>
+
+    <div th:if="${#lists.isEmpty(folders)}" class="alert alert-warning d-flex align-items-center">
+        <i class="bi bi-exclamation-circle me-2"></i>
+        <span th:if="${query != null and !#strings.isEmpty(query)}">
+            Aucun dossier trouvé pour la recherche &laquo; <span th:text="${query}">…</span> &raquo;.
+        </span>
+        <span th:unless="${query != null and !#strings.isEmpty(query)}">
+            Aucun dossier visible. Crée d'abord un dossier dans Google Drive, puis recharge cette page.
+        </span>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(folders)}" class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                <tr>
+                    <th scope="col">
+                        <i class="bi bi-folder me-1"></i>Nom du dossier
+                    </th>
+                    <th scope="col" class="d-none d-md-table-cell">Modifié le</th>
+                    <th scope="col" class="text-end">Action</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="folder : ${folders}">
+                    <td>
+                        <span th:text="${folder.name()}" class="fw-medium">Nom</span>
+                        <span th:if="${folder.id() == currentFolderId}"
+                              class="badge text-bg-success ms-2">
+                            <i class="bi bi-check-lg"></i> Actuel
+                        </span>
+                    </td>
+                    <td class="d-none d-md-table-cell text-muted small"
+                        th:text="${folder.modifiedTime() != null ? #temporals.format(folder.modifiedTime(), 'yyyy-MM-dd HH:mm') : '—'}">
+                        date
+                    </td>
+                    <td class="text-end">
+                        <form th:action="@{/setup/drive/select}" method="post" class="d-inline">
+                            <input type="hidden" name="folderId" th:value="${folder.id()}">
+                            <input type="hidden" name="folderName" th:value="${folder.name()}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary"
+                                    th:disabled="${folder.id() == currentFolderId}">
+                                <span th:if="${folder.id() == currentFolderId}">
+                                    <i class="bi bi-check-circle"></i> Sélectionné
+                                </span>
+                                <span th:unless="${folder.id() == currentFolderId}">
+                                    <i class="bi bi-arrow-right-circle"></i> Sélectionner
+                                </span>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</section>
+</body>
+</html>

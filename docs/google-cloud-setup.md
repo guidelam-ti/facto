@@ -84,14 +84,15 @@ Ce guide décrit les manipulations **manuelles** à effectuer dans la console Go
 
 1. Dans le menu de gauche de Google Auth Platform, cliquer **« Accès aux données »** (Data Access).
 2. Cliquer **« AJOUTER OU SUPPRIMER DES NIVEAUX D'ACCÈS »**.
-3. Dans le panneau de droite, cocher exactement ces deux scopes :
+3. Dans le panneau de droite, cocher exactement ces trois scopes :
 
 | Scope | Usage |
 |---|---|
 | `https://www.googleapis.com/auth/gmail.readonly` | Lecture seule des emails (Gmail) |
-| `https://www.googleapis.com/auth/drive.file` | Accès aux fichiers créés par l'app (Drive) |
+| `https://www.googleapis.com/auth/drive.metadata.readonly` | Lister les dossiers Drive existants pour le choix du dossier racine d'archivage |
+| `https://www.googleapis.com/auth/drive.file` | Créer/écrire/lire les fichiers créés par l'app (Drive) |
 
-> 💡 Astuce : utiliser le filtre du panneau (`gmail.readonly`, puis `drive.file`) pour trouver rapidement.
+> 💡 Astuce : utiliser le filtre du panneau (`gmail.readonly`, `drive.metadata.readonly`, puis `drive.file`) pour trouver rapidement.
 
 4. Cliquer **« METTRE À JOUR »** dans le panneau, puis **« ENREGISTRER »** sur la page.
 
@@ -168,7 +169,7 @@ http://localhost:8080/oauth/callback
 - ✅ Projet : `facto-invoice-archiver`
 - ✅ APIs activées : Gmail API, Google Drive API
 - ✅ Google Auth Platform : configuré (Externe, Test)
-- ✅ Scopes : `gmail.readonly`, `drive.file`
+- ✅ Scopes : `gmail.readonly`, `drive.metadata.readonly`, `drive.file`
 - ✅ Test user : email du propriétaire
 - ✅ Client OAuth 2.0 Web : redirect URI `http://localhost:8080/oauth/callback`
 - ✅ `client_id` + `client_secret` : sauvegardés en lieu sûr
