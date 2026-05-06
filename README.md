@@ -14,9 +14,17 @@ Application web **locale** (lancée via `java -jar facto.jar`, accessible sur `h
 - H2 en mode fichier (`~/.facto/db/`)
 - Pas de Spring Security (app loopback uniquement)
 
+## Setup initial
+
+**Obligatoire avant le premier lancement de l'app**, à faire une seule fois : créer un projet Google Cloud, activer les API Gmail et Drive, configurer l'écran de consentement OAuth, créer un client OAuth de type *Web application* et récupérer son `client_id` / `client_secret`.
+
+La procédure complète, pas-à-pas, avec dépannage, est dans **[docs/google-cloud-setup.md](docs/google-cloud-setup.md)**.
+
+À la fin de ce setup tu auras un `client_id` et un `client_secret` à coller dans l'écran `/setup` de l'app au premier démarrage.
+
 ## Démarrage rapide
 
-Prérequis : **Java 21** (JDK 17 ne fonctionne pas avec Spring Boot 4).
+Prérequis : **Java 21** (JDK 17 ne fonctionne pas avec Spring Boot 4) et le [setup initial](#setup-initial) terminé.
 
 ```sh
 # Build
