@@ -27,21 +27,23 @@
 
     <div class="row g-3">
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="bi bi-gear-fill text-secondary fs-4 me-2"></i>
-                        <h5 class="card-title mb-0">1. Configuration</h5>
+            <a th:href="@{/setup}" href="/setup" class="text-decoration-none text-reset">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-gear-fill text-primary fs-4 me-2"></i>
+                            <h5 class="card-title mb-0">1. Configuration</h5>
+                        </div>
+                        <p class="card-text text-muted small mb-0">
+                            Connecter ton compte Google (Gmail + Drive) via OAuth 2.0
+                            et choisir le dossier Drive racine d'archivage.
+                        </p>
                     </div>
-                    <p class="card-text text-muted small mb-0">
-                        Connecter ton compte Google (Gmail + Drive) via OAuth 2.0
-                        et choisir le dossier Drive racine d'archivage.
-                    </p>
+                    <div class="card-footer bg-transparent border-0 text-primary small">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Configurer
+                    </div>
                 </div>
-                <div class="card-footer bg-transparent border-0 text-muted small">
-                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape C
-                </div>
-            </div>
+            </a>
         </div>
         <div class="col-md-6 col-lg-4">
             <div class="card h-100 shadow-sm">
