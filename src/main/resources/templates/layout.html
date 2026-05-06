@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title layout:title-pattern="$CONTENT_TITLE — $LAYOUT_TITLE">facto</title>
+
+    <link rel="stylesheet" th:href="@{/css/bootstrap.min.css}" href="/css/bootstrap.min.css">
+    <link rel="stylesheet" th:href="@{/css/bootstrap-icons.min.css}" href="/css/bootstrap-icons.min.css">
+    <link rel="stylesheet" th:href="@{/css/inter.css}" href="/css/inter.css">
+    <link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+</head>
+<body class="d-flex flex-column min-vh-100">
+
+<header th:replace="~{fragments/navbar :: navbar}"></header>
+
+<main class="app-content flex-grow-1">
+    <div class="container">
+        <section layout:fragment="content">
+            <p>Default content (overridden by child templates).</p>
+        </section>
+    </div>
+</main>
+
+<footer th:replace="~{fragments/footer :: footer}"></footer>
+
+<script th:src="@{/js/bootstrap.bundle.min.js}" src="/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/app.js}" src="/js/app.js"></script>
+</body>
+</html>

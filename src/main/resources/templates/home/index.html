@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Accueil</title>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-house-door-fill text-primary me-2"></i>Bienvenue sur facto
+        </h1>
+    </div>
+
+    <div class="alert alert-info d-flex align-items-start" role="alert">
+        <i class="bi bi-info-circle-fill me-2 mt-1"></i>
+        <div>
+            <strong>Étape A — squelette</strong><br>
+            Le projet est en place : Spring Boot 4, Thymeleaf, Bootstrap local, H2 fichier.
+            Les écrans fonctionnels (Configuration, Scan, Fournisseurs, Traitement, Historique)
+            arrivent dans les étapes suivantes.
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-gear-fill text-secondary fs-4 me-2"></i>
+                        <h5 class="card-title mb-0">1. Configuration</h5>
+                    </div>
+                    <p class="card-text text-muted small mb-0">
+                        Connecter ton compte Google (Gmail + Drive) via OAuth 2.0
+                        et choisir le dossier Drive racine d'archivage.
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent border-0 text-muted small">
+                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape C
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-search text-secondary fs-4 me-2"></i>
+                        <h5 class="card-title mb-0">2. Scan</h5>
+                    </div>
+                    <p class="card-text text-muted small mb-0">
+                        Inspecter ta boîte de réception et regrouper les emails
+                        avec pièces jointes PDF par expéditeur.
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent border-0 text-muted small">
+                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape E
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-building text-secondary fs-4 me-2"></i>
+                        <h5 class="card-title mb-0">3. Fournisseurs</h5>
+                    </div>
+                    <p class="card-text text-muted small mb-0">
+                        Associer chaque adresse expéditeur à un fournisseur canonique
+                        (ou marquer comme à ignorer).
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent border-0 text-muted small">
+                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape E
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-play-circle-fill text-secondary fs-4 me-2"></i>
+                        <h5 class="card-title mb-0">4. Traitement</h5>
+                    </div>
+                    <p class="card-text text-muted small mb-0">
+                        Choisir une période, télécharger les PDF, les renommer
+                        et les uploader dans Drive organisés par année/mois.
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent border-0 text-muted small">
+                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape F
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="bi bi-clock-history text-secondary fs-4 me-2"></i>
+                        <h5 class="card-title mb-0">5. Historique</h5>
+                    </div>
+                    <p class="card-text text-muted small mb-0">
+                        Consulter les factures déjà traitées avec filtres par
+                        année et fournisseur.
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent border-0 text-muted small">
+                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape G
+                </div>
+            </div>
+        </div>
+    </div>
+
+</section>
+</body>
+</html>
