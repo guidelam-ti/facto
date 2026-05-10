@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Historique</title>
+    <style>
+        mark.search-hit {
+            background-color: #fff3bf;
+            padding: 0 1px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-clock-history text-primary me-2"></i>Historique des factures
+        </h1>
+    </div>
+
+    <p class="text-muted">
+        Toutes les factures déjà archivées dans Drive. Filtre par année, fournisseur ou
+        nom de fichier. Le bouton <em>Drive</em> ouvre le PDF dans un nouvel onglet.
+    </p>
+
+    <!-- Bandeau stats -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-body py-2 d-flex flex-wrap align-items-center gap-3">
+            <span><i class="bi bi-file-earmark-pdf text-primary me-1"></i>
+                <strong th:text="${totalCount}">0</strong> facture(s) archivée(s)
+            </span>
+            <span class="text-muted">·</span>
+            <span><i class="bi bi-building text-success me-1"></i>
+                <strong th:text="${#lists.size(suppliers)}">0</strong> fournisseur(s) distinct(s)
+            </span>
+            <span class="text-muted">·</span>
+            <span><i class="bi bi-calendar-range text-secondary me-1"></i>
+                <span th:if="${#lists.isEmpty(years)}" class="text-muted">aucune année</span>
+                <span th:unless="${#lists.isEmpty(years)}">
+                    de <strong th:text="${years[#lists.size(years) - 1]}">…</strong>
+                    à <strong th:text="${years[0]}">…</strong>
+                </span>
+            </span>
+        </div>
+    </div>
+
+    <div th:if="${#lists.isEmpty(invoices)}" class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        Aucune facture archivée pour l'instant. Lance un
+        <a th:href="@{/process}" class="alert-link">traitement</a> pour archiver tes premiers PDFs.
+    </div>
+
+    <div th:unless="${#lists.isEmpty(invoices)}">
+
+        <!-- Contrôles : recherche / filtres / tri -->
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-3">
+                <div class="row g-2 align-items-center">
+
+                    <div class="col-12 col-lg-4">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" id="searchInput" class="form-control"
+                                   placeholder="Rechercher dans le nom du fichier…"
+                                   autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-lg-3">
+                        <select id="yearFilter" class="form-select form-select-sm">
+                            <option value="">Toutes les années</option>
+                            <option th:each="y : ${years}"
+                                    th:value="${y}"
+                                    th:text="${y}">…</option>
+                        </select>
+                    </div>
+
+                    <div class="col-6 col-lg-3">
+                        <select id="supplierFilter" class="form-select form-select-sm">
+                            <option value="">Tous fournisseurs</option>
+                            <option th:each="s : ${suppliers}"
+                                    th:value="${s.id}"
+                                    th:text="${s.displayName}">…</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-lg-2">
+                        <select id="sortSelect" class="form-select form-select-sm">
+                            <option value="date-desc">Date ↓ (récent)</option>
+                            <option value="date-asc">Date ↑</option>
+                            <option value="supplier-asc">Fournisseur A→Z</option>
+                            <option value="filename-asc">Nom A→Z</option>
+                        </select>
+                    </div>
+
+                </div>
+                <div class="mt-2 d-flex flex-wrap align-items-center gap-2 small text-muted">
+                    <span><span id="visibleCount">0</span> ligne(s) affichée(s)</span>
+                    <button type="button" id="clearFiltersBtn" class="btn btn-link btn-sm p-0 d-none">
+                        <i class="bi bi-x-circle me-1"></i>Effacer les filtres
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle" id="historyTable">
+                    <thead class="table-light">
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Fournisseur</th>
+                        <th scope="col">Fichier archivé</th>
+                        <th scope="col" class="text-muted small">Chemin Drive</th>
+                        <th scope="col" class="text-end">Action</th>
+                    </tr>
+                    </thead>
+                    <tbody id="historyTbody">
+                    <tr th:each="inv : ${invoices}"
+                        th:attr="data-year=${inv.invoiceDate.year},
+                                 data-supplier-id=${inv.supplier.id},
+                                 data-filename=${#strings.toLowerCase(inv.archivedFileName)},
+                                 data-supplier-name=${#strings.toLowerCase(inv.supplier.displayName)},
+                                 data-date=${#temporals.format(inv.invoiceDate, 'yyyy-MM-dd')}">
+                        <td class="font-monospace small text-nowrap"
+                            th:text="${#temporals.format(inv.invoiceDate, 'yyyy-MM-dd')}">…</td>
+                        <td>
+                            <span class="badge text-bg-success">
+                                <i class="bi bi-building me-1"></i>
+                                <span th:text="${inv.supplier.displayName}">Supplier</span>
+                            </span>
+                        </td>
+                        <td class="font-monospace small filename-cell"
+                            th:attr="data-filename-original=${inv.archivedFileName}"
+                            th:text="${inv.archivedFileName}">…</td>
+                        <td class="small text-muted text-truncate" style="max-width: 280px;"
+                            th:title="${inv.drivePath}"
+                            th:text="${inv.drivePath}">…</td>
+                        <td class="text-end">
+                            <a th:href="${'https://drive.google.com/file/d/' + inv.driveFileId + '/view'}"
+                               target="_blank" rel="noopener"
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Drive
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        (function () {
+            function escapeHtml(s) {
+                return s.replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#39;');
+            }
+
+            function escapeRegex(s) {
+                return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            function renderFilename(td, search) {
+                const original = td.dataset.filenameOriginal || td.textContent;
+                if (!search) {
+                    td.textContent = original;
+                    return;
+                }
+                const re = new RegExp(escapeRegex(search), 'gi');
+                td.innerHTML = escapeHtml(original).replace(re, function (m) {
+                    return '<mark class="search-hit">' + escapeHtml(m) + '</mark>';
+                });
+            }
+
+            function applyFilters() {
+                const tbody = document.getElementById('historyTbody');
+                if (!tbody) return;
+                const search = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+                const year = document.getElementById('yearFilter').value;
+                const supplierId = document.getElementById('supplierFilter').value;
+
+                let visible = 0;
+                Array.from(tbody.rows).forEach(function (row) {
+                    const filename = row.dataset.filename || '';
+                    const rowYear = row.dataset.year || '';
+                    const rowSupplier = row.dataset.supplierId || '';
+
+                    const matchSearch = !search || filename.indexOf(search) !== -1;
+                    const matchYear = !year || rowYear === year;
+                    const matchSupplier = !supplierId || rowSupplier === supplierId;
+
+                    const show = matchSearch && matchYear && matchSupplier;
+                    row.style.display = show ? '' : 'none';
+                    if (show) {
+                        visible++;
+                        const td = row.querySelector('.filename-cell');
+                        if (td) renderFilename(td, search);
+                    }
+                });
+
+                document.getElementById('visibleCount').textContent = visible;
+                const filtersActive = !!search || !!year || !!supplierId;
+                document.getElementById('clearFiltersBtn').classList.toggle('d-none', !filtersActive);
+                persistFiltersToUrl();
+            }
+
+            function applySort() {
+                const tbody = document.getElementById('historyTbody');
+                if (!tbody) return;
+                const mode = document.getElementById('sortSelect').value;
+
+                const rows = Array.from(tbody.rows);
+                rows.sort(function (a, b) {
+                    if (mode === 'date-desc' || mode === 'date-asc') {
+                        const da = a.dataset.date || '';
+                        const db = b.dataset.date || '';
+                        if (da !== db) return mode === 'date-desc'
+                            ? db.localeCompare(da)
+                            : da.localeCompare(db);
+                        return (a.dataset.filename || '').localeCompare(b.dataset.filename || '');
+                    }
+                    if (mode === 'supplier-asc') {
+                        const sa = a.dataset.supplierName || '';
+                        const sb = b.dataset.supplierName || '';
+                        if (sa !== sb) return sa.localeCompare(sb);
+                        return (b.dataset.date || '').localeCompare(a.dataset.date || '');
+                    }
+                    if (mode === 'filename-asc') {
+                        return (a.dataset.filename || '').localeCompare(b.dataset.filename || '');
+                    }
+                    return 0;
+                });
+
+                rows.forEach(function (row) { tbody.appendChild(row); });
+            }
+
+            function persistFiltersToUrl() {
+                const params = new URLSearchParams();
+                const q = document.getElementById('searchInput').value.trim();
+                const year = document.getElementById('yearFilter').value;
+                const supplierId = document.getElementById('supplierFilter').value;
+                const sort = document.getElementById('sortSelect').value;
+                if (q) params.set('q', q);
+                if (year) params.set('year', year);
+                if (supplierId) params.set('supplier', supplierId);
+                if (sort && sort !== 'date-desc') params.set('sort', sort);
+                const qs = params.toString();
+                window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+            }
+
+            function readFiltersFromUrl() {
+                const params = new URLSearchParams(window.location.search);
+                const q = params.get('q');
+                const year = params.get('year');
+                const supplierId = params.get('supplier');
+                const sort = params.get('sort');
+                if (q) document.getElementById('searchInput').value = q;
+                if (year) {
+                    const sel = document.getElementById('yearFilter');
+                    if (sel.querySelector('option[value="' + CSS.escape(year) + '"]')) {
+                        sel.value = year;
+                    }
+                }
+                if (supplierId) {
+                    const sel = document.getElementById('supplierFilter');
+                    if (sel.querySelector('option[value="' + CSS.escape(supplierId) + '"]')) {
+                        sel.value = supplierId;
+                    }
+                }
+                if (sort) {
+                    const sortSel = document.getElementById('sortSelect');
+                    if (sortSel.querySelector('option[value="' + CSS.escape(sort) + '"]')) {
+                        sortSel.value = sort;
+                    }
+                }
+            }
+
+            function clearFilters() {
+                document.getElementById('searchInput').value = '';
+                document.getElementById('yearFilter').value = '';
+                document.getElementById('supplierFilter').value = '';
+                applyFilters();
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                readFiltersFromUrl();
+
+                const search = document.getElementById('searchInput');
+                if (search) search.addEventListener('input', applyFilters);
+
+                document.getElementById('yearFilter').addEventListener('change', applyFilters);
+                document.getElementById('supplierFilter').addEventListener('change', applyFilters);
+                document.getElementById('sortSelect').addEventListener('change', function () {
+                    applySort();
+                    applyFilters();
+                });
+                document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
+
+                // Keyboard shortcut "/"
+                document.addEventListener('keydown', function (e) {
+                    if (e.key !== '/') return;
+                    const tag = (document.activeElement && document.activeElement.tagName) || '';
+                    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                    e.preventDefault();
+                    if (search) { search.focus(); search.select(); }
+                });
+
+                applySort();
+                applyFilters();
+            });
+        })();
+    </script>
+
+</section>
+</body>
+</html>

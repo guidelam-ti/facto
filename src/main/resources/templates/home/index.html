@@ -15,16 +15,120 @@
         </h1>
     </div>
 
-    <div class="alert alert-info d-flex align-items-start" role="alert">
-        <i class="bi bi-info-circle-fill me-2 mt-1"></i>
+    <!-- Pré-vol rapide : alerte si configuration incomplète -->
+    <div th:unless="${authorized and driveFolderSelected}" class="alert alert-warning d-flex align-items-start mb-3">
+        <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
         <div>
-            <strong>Étape A — squelette</strong><br>
-            Le projet est en place : Spring Boot 4, Thymeleaf, Bootstrap local, H2 fichier.
-            Les écrans fonctionnels (Configuration, Scan, Fournisseurs, Traitement, Historique)
-            arrivent dans les étapes suivantes.
+            <strong>Configuration incomplète.</strong>
+            <span th:unless="${authorized}">Connecte d'abord ton compte Google.</span>
+            <span th:if="${authorized and !driveFolderSelected}">Choisis un dossier Drive racine pour l'archivage.</span>
+            <a th:href="@{/setup}" class="alert-link">Aller à la configuration →</a>
         </div>
     </div>
 
+    <!-- Bandeau dashboard : stats live -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <a th:href="@{/history}" class="text-decoration-none text-reset">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="bi bi-file-earmark-pdf text-primary fs-3 me-2"></i>
+                            <span class="fs-2 fw-semibold" th:text="${invoiceCount}">0</span>
+                        </div>
+                        <div class="small text-muted">facture(s) archivée(s)</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a th:href="@{/suppliers}" class="text-decoration-none text-reset">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="bi bi-building text-success fs-3 me-2"></i>
+                            <span class="fs-2 fw-semibold" th:text="${supplierCount}">0</span>
+                        </div>
+                        <div class="small text-muted">fournisseur(s)</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a th:href="@{/suppliers}" class="text-decoration-none text-reset">
+                <div class="card shadow-sm h-100"
+                     th:classappend="${pendingMappings > 0} ? 'border-warning' : ''">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="bi bi-hourglass-split fs-3 me-2"
+                               th:classappend="${pendingMappings > 0} ? 'text-warning' : 'text-muted'"></i>
+                            <span class="fs-2 fw-semibold" th:text="${pendingMappings}">0</span>
+                        </div>
+                        <div class="small text-muted">expéditeur(s) à valider</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="bi bi-clock-history text-secondary fs-3 me-2"></i>
+                        <span class="fw-semibold" th:if="${lastProcess != null}"
+                              th:text="${#temporals.format(lastProcess.startedAt, 'yyyy-MM-dd')}">…</span>
+                        <span class="fw-semibold text-muted" th:if="${lastProcess == null}">—</span>
+                    </div>
+                    <div class="small text-muted">dernier traitement</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activité récente : 5 dernières factures archivées -->
+    <div th:if="${!#lists.isEmpty(recentInvoices)}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <h2 class="h6 mb-0">
+                    <i class="bi bi-activity text-primary me-2"></i>Activité récente
+                </h2>
+                <a th:href="@{/history}" class="small text-decoration-none">
+                    Voir tout l'historique <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle">
+                    <tbody>
+                    <tr th:each="inv : ${recentInvoices}">
+                        <td class="font-monospace small text-nowrap"
+                            style="width: 110px;"
+                            th:text="${#temporals.format(inv.invoiceDate, 'yyyy-MM-dd')}">…</td>
+                        <td>
+                            <span class="badge text-bg-success">
+                                <i class="bi bi-building me-1"></i>
+                                <span th:text="${inv.supplier.displayName}">Supplier</span>
+                            </span>
+                        </td>
+                        <td class="font-monospace small text-truncate" style="max-width: 360px;"
+                            th:title="${inv.archivedFileName}"
+                            th:text="${inv.archivedFileName}">…</td>
+                        <td class="text-end">
+                            <a th:href="${'https://drive.google.com/file/d/' + inv.driveFileId + '/view'}"
+                               target="_blank" rel="noopener"
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cartes de navigation vers les écrans -->
+    <h2 class="h5 text-muted mb-3 mt-4">
+        <i class="bi bi-compass me-2"></i>Workflow
+    </h2>
     <div class="row g-3">
         <div class="col-md-6 col-lg-4">
             <a th:href="@{/setup}" href="/setup" class="text-decoration-none text-reset">
@@ -103,21 +207,23 @@
             </a>
         </div>
         <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="bi bi-clock-history text-secondary fs-4 me-2"></i>
-                        <h5 class="card-title mb-0">5. Historique</h5>
+            <a th:href="@{/history}" href="/history" class="text-decoration-none text-reset">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-clock-history text-primary fs-4 me-2"></i>
+                            <h5 class="card-title mb-0">5. Historique</h5>
+                        </div>
+                        <p class="card-text text-muted small mb-0">
+                            Consulter les factures déjà traitées avec filtres par
+                            année et fournisseur.
+                        </p>
                     </div>
-                    <p class="card-text text-muted small mb-0">
-                        Consulter les factures déjà traitées avec filtres par
-                        année et fournisseur.
-                    </p>
+                    <div class="card-footer bg-transparent border-0 text-primary small">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Consulter l'historique
+                    </div>
                 </div>
-                <div class="card-footer bg-transparent border-0 text-muted small">
-                    <i class="bi bi-hourglass-split me-1"></i>Disponible à l'étape G
-                </div>
-            </div>
+            </a>
         </div>
     </div>
 
