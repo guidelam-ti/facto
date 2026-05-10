@@ -14,6 +14,8 @@ public interface ProcessedInvoiceRepository extends JpaRepository<ProcessedInvoi
 
     Optional<ProcessedInvoice> findByFileHash(String fileHash);
 
+    boolean existsByDrivePath(String drivePath);
+
     List<ProcessedInvoice> findByInvoiceDateBetweenOrderByInvoiceDateDesc(
             LocalDate start, LocalDate end);
 

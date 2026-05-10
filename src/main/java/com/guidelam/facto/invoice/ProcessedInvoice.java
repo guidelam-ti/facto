@@ -45,7 +45,7 @@ public class ProcessedInvoice {
     @Column(name = "gmail_message_id", nullable = false, length = 100)
     private String gmailMessageId;
 
-    @Column(name = "gmail_attachment_id", nullable = false, length = 200)
+    @Column(name = "gmail_attachment_id", nullable = false, length = 1024)
     private String gmailAttachmentId;
 
     @Column(name = "file_hash", nullable = false, length = 64)

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Traitement — progression</title>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-arrow-repeat text-primary me-2"></i>Traitement en cours
+        </h1>
+        <a th:href="@{/process}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Retour
+        </a>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between align-items-baseline mb-2">
+                <span class="text-muted small">
+                    <span id="processedItems">0</span> / <span id="totalItems">?</span> examinés
+                    · <span id="archivedItems" class="text-success fw-medium">0</span> archivé(s)
+                    · <span id="errorCount">0</span> erreur(s)
+                </span>
+                <span id="status" class="badge text-bg-info">PENDING</span>
+            </div>
+
+            <div class="progress mb-3" role="progressbar" style="height: 1.5rem;">
+                <div id="progressBar"
+                     class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                     style="width: 0%;">0%</div>
+            </div>
+
+            <div class="d-flex align-items-center text-muted small mb-2">
+                <i class="bi bi-arrow-right-circle me-2"></i>
+                <span id="currentStep">Initialisation…</span>
+            </div>
+
+            <div class="row g-3 small text-muted mb-3">
+                <div class="col-sm-4">
+                    <i class="bi bi-stopwatch me-1"></i>
+                    Temps écoulé : <span id="elapsed" class="fw-medium text-dark">0s</span>
+                </div>
+                <div class="col-sm-4">
+                    <i class="bi bi-speedometer2 me-1"></i>
+                    Cadence : <span id="rate" class="fw-medium text-dark">—</span>
+                </div>
+                <div class="col-sm-4">
+                    <i class="bi bi-arrow-clockwise me-1"></i>
+                    Dernière maj : <span id="lastPoll" class="fw-medium text-dark">—</span>
+                </div>
+            </div>
+
+            <div id="successPanel" class="alert alert-success d-none" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <strong>Traitement terminé.</strong>
+                <a th:href="@{/process}" class="alert-link">Retour au traitement →</a>
+            </div>
+
+            <div id="errorPanel" class="alert alert-danger d-none" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Le traitement a échoué :</strong>
+                <span id="errorMessage">…</span>
+            </div>
+
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const jobId = /*[[${jobId}]]*/ 0;
+        const POLL_INTERVAL_MS = 2000;
+        let pollHandle = null;
+        let elapsedHandle = null;
+        let startedAtMs = null;
+
+        function formatElapsed(ms) {
+            const s = Math.floor(ms / 1000);
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            if (h > 0) return `${h}h ${m}m ${sec}s`;
+            if (m > 0) return `${m}m ${sec}s`;
+            return `${sec}s`;
+        }
+
+        function tickElapsed() {
+            if (startedAtMs == null) return;
+            const ms = Date.now() - startedAtMs;
+            const el = document.getElementById('elapsed');
+            if (el) el.textContent = formatElapsed(ms);
+
+            const processed = Number(document.getElementById('processedItems').textContent) || 0;
+            const rateEl = document.getElementById('rate');
+            if (processed > 0 && ms > 1000) {
+                const perSec = (processed / (ms / 1000)).toFixed(2);
+                rateEl.textContent = `${perSec} msg/s`;
+            }
+        }
+
+        async function fetchStatus() {
+            try {
+                const resp = await fetch(`/api/jobs/${jobId}/status`, {cache: 'no-store'});
+                if (!resp.ok) return;
+                const job = await resp.json();
+                renderJob(job);
+                document.getElementById('lastPoll').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                console.warn('poll failed', e);
+            }
+        }
+
+        function renderJob(job) {
+            if (job.startedAtIso && startedAtMs == null) {
+                startedAtMs = new Date(job.startedAtIso).getTime();
+            }
+            document.getElementById('status').textContent = job.status;
+            document.getElementById('processedItems').textContent = job.processedItems;
+            document.getElementById('totalItems').textContent = job.totalItems || '?';
+            document.getElementById('archivedItems').textContent = job.archivedItems || 0;
+            document.getElementById('errorCount').textContent = job.errorCount || 0;
+            document.getElementById('currentStep').textContent = job.currentStep || '…';
+
+            const bar = document.getElementById('progressBar');
+            const pct = Math.max(0, Math.min(100, job.percentComplete || 0));
+            bar.style.width = pct + '%';
+            bar.textContent = pct + '%';
+
+            if (job.status === 'SUCCESS') {
+                stopPolling();
+                bar.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-primary');
+                bar.classList.add('bg-success');
+                document.getElementById('status').classList.remove('text-bg-info');
+                document.getElementById('status').classList.add('text-bg-success');
+                document.getElementById('successPanel').classList.remove('d-none');
+            } else if (job.status === 'FAILED' || job.status === 'CANCELLED') {
+                stopPolling();
+                bar.classList.remove('progress-bar-animated', 'progress-bar-striped', 'bg-primary');
+                bar.classList.add('bg-danger');
+                document.getElementById('status').classList.remove('text-bg-info');
+                document.getElementById('status').classList.add('text-bg-danger');
+                document.getElementById('errorMessage').textContent = job.errorMessage || job.status;
+                document.getElementById('errorPanel').classList.remove('d-none');
+            }
+        }
+
+        function stopPolling() {
+            if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+            if (elapsedHandle) { clearInterval(elapsedHandle); elapsedHandle = null; }
+            tickElapsed();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchStatus();
+            pollHandle = setInterval(fetchStatus, POLL_INTERVAL_MS);
+            elapsedHandle = setInterval(tickElapsed, 1000);
+        });
+    </script>
+
+</section>
+</body>
+</html>

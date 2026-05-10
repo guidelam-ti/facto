@@ -2,6 +2,7 @@ package com.guidelam.facto.supplier;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -9,6 +10,13 @@ import java.util.Optional;
 public interface SupplierMappingRepository extends JpaRepository<SupplierMapping, Long> {
 
     Optional<SupplierMapping> findByEmailAddress(String emailAddress);
+
+    /**
+     * Variant that eagerly fetches the supplier so callers can dereference
+     * {@code mapping.getSupplier().getCanonicalName()} after the session closes.
+     */
+    @Query("SELECT m FROM SupplierMapping m LEFT JOIN FETCH m.supplier WHERE m.emailAddress = :email")
+    Optional<SupplierMapping> findByEmailAddressFetchSupplier(@Param("email") String email);
 
     List<SupplierMapping> findBySupplierIsNullAndIgnoredFalse();
 

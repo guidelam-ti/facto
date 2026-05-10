@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
@@ -32,11 +33,11 @@ public class ProcessingJob {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
     private ProcessingJobType type;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "VARCHAR(20)")
     private ProcessingStatus status = ProcessingStatus.PENDING;
 
     @CreationTimestamp
@@ -51,6 +52,10 @@ public class ProcessingJob {
 
     @Column(name = "processed_items", nullable = false)
     private int processedItems = 0;
+
+    @Column(name = "archived_items", nullable = false)
+    @ColumnDefault("0")
+    private int archivedItems = 0;
 
     @Column(name = "error_count", nullable = false)
     private int errorCount = 0;

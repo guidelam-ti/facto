@@ -142,7 +142,7 @@ public class GmailMessageScanner {
         jobRepository.save(job);
     }
 
-    static String extractHeader(Message msg, String name) {
+    public static String extractHeader(Message msg, String name) {
         if (msg.getPayload() == null || msg.getPayload().getHeaders() == null) {
             return null;
         }
@@ -154,7 +154,7 @@ public class GmailMessageScanner {
         return null;
     }
 
-    static String normalizeEmail(String fromHeader) {
+    public static String normalizeEmail(String fromHeader) {
         if (fromHeader == null) return null;
         int lt = fromHeader.lastIndexOf('<');
         int gt = fromHeader.lastIndexOf('>');
