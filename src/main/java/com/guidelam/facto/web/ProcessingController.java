@@ -11,6 +11,7 @@ import com.guidelam.facto.settings.AppSettingKeys;
 import com.guidelam.facto.settings.SettingsService;
 import com.guidelam.facto.supplier.SupplierMappingRepository;
 import com.guidelam.facto.web.dto.PeriodForm;
+import com.guidelam.facto.web.dto.ResetForm;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -54,6 +55,9 @@ public class ProcessingController {
         if (!model.containsAttribute("form")) {
             model.addAttribute("form", defaultForm());
         }
+        if (!model.containsAttribute("resetForm")) {
+            model.addAttribute("resetForm", defaultResetForm(lastJob));
+        }
         model.addAttribute("authorized", authorized);
         model.addAttribute("driveFolderName", driveFolderName);
         model.addAttribute("driveFolderSelected", driveFolderSelected);
@@ -65,17 +69,37 @@ public class ProcessingController {
     }
 
     @PostMapping("/reset")
-    public String reset(RedirectAttributes redirect) {
+    public String reset(@ModelAttribute("resetForm") ResetForm form,
+                        RedirectAttributes redirect) {
         if (!tokenStore.isAuthorized()) {
             redirect.addFlashAttribute("error",
-                    "Connecte d'abord ton compte Google avant de réinitialiser.");
+                    "Connecte d'abord ton compte Google avant de lancer un nettoyage.");
             return "redirect:/setup";
         }
+        LocalDate start = null;
+        LocalDate end = null;
+        if ("period".equals(form.getMode())) {
+            start = form.getPeriodStart();
+            end = form.getPeriodEnd();
+            if (start == null || end == null) {
+                redirect.addFlashAttribute("error",
+                        "Mode période : choisis une date de début et une date de fin.");
+                redirect.addFlashAttribute("resetForm", form);
+                return "redirect:/process";
+            }
+            if (start.isAfter(end)) {
+                redirect.addFlashAttribute("error",
+                        "La date de fin doit être supérieure ou égale à la date de début.");
+                redirect.addFlashAttribute("resetForm", form);
+                return "redirect:/process";
+            }
+        }
         try {
-            ProcessingJob job = resetService.startReset();
+            ProcessingJob job = resetService.startReset(start, end);
             return "redirect:/process/reset/progress/" + job.getId();
         } catch (IllegalStateException e) {
             redirect.addFlashAttribute("error", e.getMessage());
+            redirect.addFlashAttribute("resetForm", form);
             return "redirect:/process";
         }
     }
@@ -127,5 +151,17 @@ public class ProcessingController {
         LocalDate firstOfPrevMonth = firstOfThisMonth.minusMonths(1);
         LocalDate lastOfPrevMonth = firstOfThisMonth.minusDays(1);
         return new PeriodForm(firstOfPrevMonth, lastOfPrevMonth);
+    }
+
+    private ResetForm defaultResetForm(ProcessingJob lastJob) {
+        LocalDate start = lastJob != null ? lastJob.getPeriodStart() : null;
+        LocalDate end = lastJob != null ? lastJob.getPeriodEnd() : null;
+        if (start == null || end == null) {
+            LocalDate today = LocalDate.now();
+            LocalDate firstOfThisMonth = today.withDayOfMonth(1);
+            start = firstOfThisMonth.minusMonths(1);
+            end = firstOfThisMonth.minusDays(1);
+        }
+        return new ResetForm("all", start, end);
     }
 }

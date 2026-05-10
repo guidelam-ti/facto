@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,11 +68,19 @@ public class ResetOrchestrator {
                 .filter(s -> !s.isBlank())
                 .orElse(null);
 
+        LocalDate start = job.getPeriodStart();
+        LocalDate end = job.getPeriodEnd();
+        boolean scoped = (start != null && end != null);
+
         job.setStatus(ProcessingStatus.RUNNING);
-        job.setCurrentStep("Comptage des factures à supprimer");
+        job.setCurrentStep(scoped
+                ? String.format("Comptage des factures à supprimer (%s → %s)", start, end)
+                : "Comptage des factures à supprimer");
         jobRepository.save(job);
 
-        List<ProcessedInvoice> invoices = invoiceRepository.findAll();
+        List<ProcessedInvoice> invoices = scoped
+                ? invoiceRepository.findByInvoiceDateBetweenOrderByInvoiceDateDesc(start, end)
+                : invoiceRepository.findAll();
         job.setTotalItems(invoices.size());
         job.setCurrentStep(String.format("%d facture(s) à supprimer de Drive et de la base", invoices.size()));
         jobRepository.save(job);
@@ -106,6 +115,7 @@ public class ResetOrchestrator {
         jobRepository.save(job);
 
         // Phase 2 + 3: cleanup empty year/month folders, then empty year folders
+        // (scoped automatically — yearMonths/seenYears only contain entries from invoices we just deleted)
         if (rootFolderId != null) {
             job.setCurrentStep("Suppression des dossiers Drive vides");
             jobRepository.save(job);
@@ -115,18 +125,26 @@ public class ResetOrchestrator {
             log.warn("No drive root folder configured — skipping folder cleanup");
         }
 
-        // Phase 4: clear PROCESS job history (keep current RESET and SCAN jobs)
-        job.setCurrentStep("Nettoyage de l'historique des jobs de traitement");
-        jobRepository.save(job);
-        List<ProcessingJob> oldProcess = jobRepository.findByTypeOrderByStartedAtDesc(ProcessingJobType.PROCESS);
-        jobRepository.deleteAll(oldProcess);
+        // Phase 4: in full-reset mode, clear PROCESS job history (keep current RESET and SCAN jobs).
+        // In scoped mode, leave history untouched — old PROCESS jobs still describe what was processed,
+        // even if some of those invoices have now been removed.
+        int purgedJobs = 0;
+        if (!scoped) {
+            job.setCurrentStep("Nettoyage de l'historique des jobs de traitement");
+            jobRepository.save(job);
+            List<ProcessingJob> oldProcess = jobRepository.findByTypeOrderByStartedAtDesc(ProcessingJobType.PROCESS);
+            purgedJobs = oldProcess.size();
+            jobRepository.deleteAll(oldProcess);
+        }
 
         // Final state
         job.setStatus(ProcessingStatus.SUCCESS);
         job.setFinishedAt(Instant.now());
-        job.setCurrentStep(String.format(
-                "Terminé : %d facture(s) supprimée(s), %d erreur(s), %d job(s) PROCESS purgé(s)",
-                processed, errors, oldProcess.size()));
+        job.setCurrentStep(scoped
+                ? String.format("Terminé (%s → %s) : %d facture(s) supprimée(s), %d erreur(s)",
+                        start, end, processed, errors)
+                : String.format("Terminé : %d facture(s) supprimée(s), %d erreur(s), %d job(s) PROCESS purgé(s)",
+                        processed, errors, purgedJobs));
         jobRepository.save(job);
     }
 

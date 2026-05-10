@@ -153,19 +153,67 @@
             <div class="card shadow-sm border-danger">
                 <div class="card-body">
                     <h2 class="h5 card-title text-danger">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Zone dangereuse
+                        <i class="bi bi-trash-fill me-2"></i>Nettoyage
                     </h2>
                     <p class="text-muted small mb-3">
-                        Recommencer à zéro : supprime <strong th:text="${invoiceCount}">0</strong>
-                        facture(s) archivée(s) de Drive et de la base, vide les dossiers Drive
-                        année/mois s'ils sont vides, et purge l'historique des traitements.
+                        Supprime des factures archivées (fichiers Drive + lignes en base) et
+                        nettoie les dossiers Drive <code>année/mois</code> s'ils sont vides.
                         Tes mappings expéditeurs/fournisseurs et la config OAuth sont conservés.
                     </p>
-                    <button type="button" class="btn btn-outline-danger"
-                            data-bs-toggle="modal" data-bs-target="#resetModal"
-                            th:disabled="${!authorized}">
-                        <i class="bi bi-trash me-1"></i>Recommencer à zéro
-                    </button>
+
+                    <form method="post" th:action="@{/process/reset}" th:object="${resetForm}" id="resetForm">
+
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="radio" id="modeAll"
+                                   th:field="*{mode}" value="all">
+                            <label class="form-check-label" for="modeAll">
+                                <strong>Tout</strong>
+                                <span class="text-muted">— supprime les
+                                    <strong th:text="${invoiceCount}">0</strong>
+                                    facture(s) archivée(s) et purge l'historique des traitements
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" id="modePeriod"
+                                   th:field="*{mode}" value="period">
+                            <label class="form-check-label" for="modePeriod">
+                                <strong>Période spécifique</strong>
+                                <span class="text-muted">— supprime uniquement les factures dont
+                                    la date est comprise dans la période ci-dessous
+                                    (les deux dates sont incluses)
+                                </span>
+                            </label>
+                        </div>
+
+                        <div id="resetPeriodInputs" class="row g-2 mt-1 ms-4 mb-2">
+                            <div class="col-md-5">
+                                <label for="resetPeriodStart" class="form-label small mb-1">
+                                    Date de début (incluse)
+                                </label>
+                                <input type="date" id="resetPeriodStart" th:field="*{periodStart}"
+                                       class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-5">
+                                <label for="resetPeriodEnd" class="form-label small mb-1">
+                                    Date de fin (incluse)
+                                </label>
+                                <input type="date" id="resetPeriodEnd" th:field="*{periodEnd}"
+                                       class="form-control form-control-sm">
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-danger mt-2"
+                                id="openResetModalBtn"
+                                th:disabled="${!authorized}">
+                            <i class="bi bi-trash me-1"></i>Lancer le nettoyage
+                        </button>
+
+                        <p th:unless="${authorized}" class="small text-muted mt-2 mb-0">
+                            <i class="bi bi-info-circle me-1"></i>Connecte ton compte Google avant de lancer un nettoyage.
+                        </p>
+                    </form>
                 </div>
             </div>
         </div>
@@ -176,18 +224,35 @@
             <div class="modal-content">
                 <div class="modal-header bg-danger text-white">
                     <h1 class="modal-title fs-5" id="resetModalLabel">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Recommencer à zéro
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmer le nettoyage
                     </h1>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Cette action est <strong>irréversible</strong>. Elle va :</p>
-                    <ul class="mb-3">
-                        <li>Supprimer les <strong th:text="${invoiceCount}">0</strong> facture(s) archivée(s)
-                            <span class="text-muted">(fichiers PDF dans Google Drive + lignes dans la base)</span></li>
-                        <li>Supprimer les dossiers Drive <code>année/mois</code> s'ils sont vides après nettoyage</li>
-                        <li>Purger l'historique des traitements précédents</li>
-                    </ul>
+                    <p>Cette action est <strong>irréversible</strong>.</p>
+
+                    <div id="resetSummaryAll" class="d-none">
+                        <p class="mb-2">Tu vas :</p>
+                        <ul class="mb-3">
+                            <li>Supprimer les <strong th:text="${invoiceCount}">0</strong> facture(s) archivée(s)
+                                <span class="text-muted">(fichiers PDF dans Drive + lignes en base)</span></li>
+                            <li>Supprimer les dossiers Drive <code>année/mois</code> s'ils sont vides après nettoyage</li>
+                            <li>Purger l'historique des traitements précédents</li>
+                        </ul>
+                    </div>
+
+                    <div id="resetSummaryPeriod" class="d-none">
+                        <p class="mb-2">Tu vas supprimer toutes les factures dont la date est entre
+                            <strong id="resetSummaryStart">…</strong> et
+                            <strong id="resetSummaryEnd">…</strong> (incluses), ainsi que les
+                            dossiers Drive <code>année/mois</code> qui deviennent vides.
+                        </p>
+                        <p class="small text-muted mb-3">
+                            <i class="bi bi-info-circle me-1"></i>L'historique des traitements
+                            n'est pas touché en mode période.
+                        </p>
+                    </div>
+
                     <p class="mb-0 small">
                         <i class="bi bi-info-circle me-1"></i>
                         <strong>Conservés</strong> : tes identifiants Google, le dossier Drive racine,
@@ -196,15 +261,74 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <form method="post" th:action="@{/process/reset}" class="d-inline">
-                        <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash me-1"></i>Confirmer la suppression
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-danger" id="confirmResetBtn">
+                        <i class="bi bi-trash me-1"></i>Confirmer
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const form = document.getElementById('resetForm');
+            const periodInputs = document.getElementById('resetPeriodInputs');
+            const startInput = document.getElementById('resetPeriodStart');
+            const endInput = document.getElementById('resetPeriodEnd');
+            const openBtn = document.getElementById('openResetModalBtn');
+            const confirmBtn = document.getElementById('confirmResetBtn');
+            const summaryAll = document.getElementById('resetSummaryAll');
+            const summaryPeriod = document.getElementById('resetSummaryPeriod');
+            const summaryStart = document.getElementById('resetSummaryStart');
+            const summaryEnd = document.getElementById('resetSummaryEnd');
+
+            function selectedMode() {
+                const checked = form.querySelector('input[name="mode"]:checked');
+                return checked ? checked.value : 'all';
+            }
+
+            function syncMode() {
+                const isPeriod = selectedMode() === 'period';
+                periodInputs.classList.toggle('d-none', !isPeriod);
+                startInput.disabled = !isPeriod;
+                endInput.disabled = !isPeriod;
+            }
+
+            form.querySelectorAll('input[name="mode"]').forEach(function (r) {
+                r.addEventListener('change', syncMode);
+            });
+            syncMode();
+
+            openBtn.addEventListener('click', function () {
+                const mode = selectedMode();
+                if (mode === 'period') {
+                    const s = startInput.value;
+                    const e = endInput.value;
+                    if (!s || !e) {
+                        alert('Choisis une date de début et une date de fin.');
+                        return;
+                    }
+                    if (s > e) {
+                        alert('La date de fin doit être supérieure ou égale à la date de début.');
+                        return;
+                    }
+                    summaryStart.textContent = s;
+                    summaryEnd.textContent = e;
+                    summaryAll.classList.add('d-none');
+                    summaryPeriod.classList.remove('d-none');
+                } else {
+                    summaryAll.classList.remove('d-none');
+                    summaryPeriod.classList.add('d-none');
+                }
+                const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('resetModal'));
+                modal.show();
+            });
+
+            confirmBtn.addEventListener('click', function () {
+                form.submit();
+            });
+        })();
+    </script>
 
 </section>
 </body>
