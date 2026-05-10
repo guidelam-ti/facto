@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Scan</title>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-search text-primary me-2"></i>Scan de la boîte Gmail
+        </h1>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${info}" class="alert alert-info" th:text="${info}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <p class="text-muted">
+        Le scan parcourt ta boîte Gmail à la recherche de messages avec des pièces jointes
+        <strong>PDF</strong> (requête Gmail : <code>has:attachment filename:pdf</code>),
+        regroupe les expéditeurs et compte les messages par expéditeur. Aucun fichier n'est
+        téléchargé à cette étape — l'archivage Drive se fait à l'étape <em>Traitement</em>.
+    </p>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-clock-history text-secondary me-2"></i>Dernier scan
+                    </h2>
+
+                    <div th:if="${lastScan == null}" class="text-muted">
+                        Aucun scan exécuté pour l'instant.
+                    </div>
+
+                    <div th:if="${lastScan != null}">
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-4">Démarré le</dt>
+                            <dd class="col-sm-8" th:text="${#temporals.format(lastScan.startedAt, 'yyyy-MM-dd HH:mm')}">date</dd>
+
+                            <dt class="col-sm-4">Statut</dt>
+                            <dd class="col-sm-8">
+                                <span th:switch="${lastScan.status.name()}">
+                                    <span th:case="'SUCCESS'" class="badge text-bg-success">Réussi</span>
+                                    <span th:case="'RUNNING'" class="badge text-bg-info">En cours</span>
+                                    <span th:case="'PENDING'" class="badge text-bg-secondary">En attente</span>
+                                    <span th:case="'FAILED'" class="badge text-bg-danger">Échoué</span>
+                                    <span th:case="*" class="badge text-bg-secondary" th:text="${lastScan.status}">…</span>
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-4">Messages examinés</dt>
+                            <dd class="col-sm-8" th:text="${lastScan.processedItems + ' / ' + lastScan.totalItems}">0 / 0</dd>
+
+                            <dt class="col-sm-4">Étape</dt>
+                            <dd class="col-sm-8 text-muted" th:text="${lastScan.currentStep ?: '—'}">—</dd>
+
+                            <dt th:if="${lastScan.errorMessage}" class="col-sm-4">Erreur</dt>
+                            <dd th:if="${lastScan.errorMessage}" class="col-sm-8 text-danger small" th:text="${lastScan.errorMessage}">…</dd>
+                        </dl>
+
+                        <div th:if="${lastScan.status.name() == 'RUNNING'}" class="mt-3">
+                            <a th:href="@{'/scan/progress/' + ${lastScan.id}}" class="btn btn-outline-info btn-sm">
+                                <i class="bi bi-eye me-1"></i>Voir la progression
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-play-circle-fill text-secondary me-2"></i>Lancer un nouveau scan
+                    </h2>
+
+                    <div th:unless="${authorized}" class="alert alert-warning d-flex align-items-center" role="alert">
+                        <i class="bi bi-exclamation-circle-fill me-2"></i>
+                        <span>Connecte ton compte Google dans <a th:href="@{/setup}" class="alert-link">la configuration</a> avant de scanner.</span>
+                    </div>
+
+                    <p class="small text-muted">
+                        Selon la taille de ta boîte, le scan peut prendre de quelques secondes
+                        à plusieurs minutes (≈ 100 ms par message).
+                    </p>
+
+                    <div th:if="${pendingMappingsCount > 0}" class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        Tu as <strong th:text="${pendingMappingsCount}">0</strong> expéditeur(s) en attente
+                        de mapping vers un fournisseur.
+                        <a th:href="@{/suppliers}" class="alert-link">Aller aux fournisseurs →</a>
+                    </div>
+
+                    <form method="post" th:action="@{/scan/start}" class="mt-auto">
+                        <button type="submit" class="btn btn-primary"
+                                th:disabled="${!authorized || isRunning}">
+                            <i class="bi bi-search me-1"></i>
+                            <span th:if="${isRunning}">Scan en cours…</span>
+                            <span th:unless="${isRunning}">Scanner ma boîte Gmail</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</section>
+</body>
+</html>

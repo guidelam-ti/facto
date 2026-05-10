@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Traitement</title>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-play-circle-fill text-primary me-2"></i>Traitement et archivage
+        </h1>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${info}" class="alert alert-info" th:text="${info}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <p class="text-muted">
+        Pour la période choisie : on télécharge les PDFs des messages dont l'expéditeur
+        est mappé à un fournisseur, on les renomme
+        <code>aaaa-mm-jj_facture_NOM-FOURNISSEUR.pdf</code>, et on les archive dans
+        Drive sous <code>&lt;dossier racine&gt;/&lt;année&gt;/&lt;MM-mois&gt;/</code>.
+        Le traitement est <strong>idempotent</strong> : relancer sur la même période
+        ne ré-archive pas les factures déjà traitées.
+    </p>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-clipboard-check text-secondary me-2"></i>Pré-vol
+                    </h2>
+
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span>
+                                <i th:if="${authorized}" class="bi bi-check-circle-fill text-success me-2"></i>
+                                <i th:unless="${authorized}" class="bi bi-x-circle-fill text-danger me-2"></i>
+                                Compte Google connecté
+                            </span>
+                            <a th:unless="${authorized}" th:href="@{/setup}" class="btn btn-sm btn-outline-primary">Configurer</a>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span>
+                                <i th:if="${driveFolderSelected}" class="bi bi-check-circle-fill text-success me-2"></i>
+                                <i th:unless="${driveFolderSelected}" class="bi bi-x-circle-fill text-danger me-2"></i>
+                                Dossier Drive racine sélectionné
+                                <span th:if="${driveFolderSelected}" class="text-muted"> : <code th:text="${driveFolderName}">…</code></span>
+                            </span>
+                            <a th:unless="${driveFolderSelected}" th:href="@{/setup/drive}" class="btn btn-sm btn-outline-primary">Choisir</a>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <span>
+                                <i th:if="${pendingMappingsCount == 0}" class="bi bi-check-circle-fill text-success me-2"></i>
+                                <i th:unless="${pendingMappingsCount == 0}" class="bi bi-exclamation-circle-fill text-warning me-2"></i>
+                                <span th:if="${pendingMappingsCount == 0}">Tous les expéditeurs sont décidés</span>
+                                <span th:unless="${pendingMappingsCount == 0}">
+                                    <strong th:text="${pendingMappingsCount}">0</strong> expéditeur(s) non décidé(s) — leurs PDFs seront ignorés
+                                </span>
+                            </span>
+                            <a th:unless="${pendingMappingsCount == 0}" th:href="@{/suppliers}" class="btn btn-sm btn-outline-primary">Mapper</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-calendar-range text-secondary me-2"></i>Période
+                    </h2>
+
+                    <form method="post" th:action="@{/process/start}" th:object="${form}" class="mt-2">
+                        <div class="mb-3">
+                            <label for="periodStart" class="form-label">Date de début</label>
+                            <input type="date" id="periodStart" th:field="*{periodStart}"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('periodStart')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('periodStart')}"
+                                 th:errors="*{periodStart}">Erreur</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="periodEnd" class="form-label">Date de fin (inclusive)</label>
+                            <input type="date" id="periodEnd" th:field="*{periodEnd}"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('periodEnd')} ? 'is-invalid'">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('periodEnd')}"
+                                 th:errors="*{periodEnd}">Erreur</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary mt-auto"
+                                th:disabled="${!readyToStart}">
+                            <i class="bi bi-play-fill me-1"></i>Lancer le traitement
+                        </button>
+                    </form>
+
+                    <p th:unless="${readyToStart}" class="small text-muted mt-2 mb-0">
+                        <i class="bi bi-info-circle me-1"></i>Complète le pré-vol avant de lancer.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" th:if="${lastJob != null}">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-clock-history text-secondary me-2"></i>Dernier traitement
+                    </h2>
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-3">Période</dt>
+                        <dd class="col-sm-9" th:text="${lastJob.periodStart + ' → ' + lastJob.periodEnd}">…</dd>
+
+                        <dt class="col-sm-3">Démarré le</dt>
+                        <dd class="col-sm-9" th:text="${#temporals.format(lastJob.startedAt, 'yyyy-MM-dd HH:mm')}">…</dd>
+
+                        <dt class="col-sm-3">Statut</dt>
+                        <dd class="col-sm-9">
+                            <span th:switch="${lastJob.status.name()}">
+                                <span th:case="'SUCCESS'" class="badge text-bg-success">Réussi</span>
+                                <span th:case="'RUNNING'" class="badge text-bg-info">En cours</span>
+                                <span th:case="'PENDING'" class="badge text-bg-secondary">En attente</span>
+                                <span th:case="'FAILED'" class="badge text-bg-danger">Échoué</span>
+                                <span th:case="*" class="badge text-bg-secondary" th:text="${lastJob.status}">…</span>
+                            </span>
+                            <a th:if="${lastJob.status.name() == 'RUNNING'}"
+                               th:href="@{'/process/progress/' + ${lastJob.id}}"
+                               class="btn btn-outline-info btn-sm ms-2">Voir la progression</a>
+                        </dd>
+
+                        <dt class="col-sm-3">Étape</dt>
+                        <dd class="col-sm-9 text-muted" th:text="${lastJob.currentStep ?: '—'}">…</dd>
+
+                        <dt class="col-sm-3">Résumé</dt>
+                        <dd class="col-sm-9"
+                            th:text="${lastJob.processedItems + ' / ' + lastJob.totalItems + ' examinés   ·   ' + lastJob.archivedItems + ' archivés   ·   ' + lastJob.errorCount + ' erreur(s)'}">…</dd>
+
+                        <dt th:if="${lastJob.errorMessage}" class="col-sm-3">Erreur</dt>
+                        <dd th:if="${lastJob.errorMessage}" class="col-sm-9 text-danger small" th:text="${lastJob.errorMessage}">…</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 mt-4">
+            <div class="card shadow-sm border-danger">
+                <div class="card-body">
+                    <h2 class="h5 card-title text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Zone dangereuse
+                    </h2>
+                    <p class="text-muted small mb-3">
+                        Recommencer à zéro : supprime <strong th:text="${invoiceCount}">0</strong>
+                        facture(s) archivée(s) de Drive et de la base, vide les dossiers Drive
+                        année/mois s'ils sont vides, et purge l'historique des traitements.
+                        Tes mappings expéditeurs/fournisseurs et la config OAuth sont conservés.
+                    </p>
+                    <button type="button" class="btn btn-outline-danger"
+                            data-bs-toggle="modal" data-bs-target="#resetModal"
+                            th:disabled="${!authorized}">
+                        <i class="bi bi-trash me-1"></i>Recommencer à zéro
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="resetModal" tabindex="-1" aria-labelledby="resetModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h1 class="modal-title fs-5" id="resetModalLabel">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>Recommencer à zéro
+                    </h1>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Cette action est <strong>irréversible</strong>. Elle va :</p>
+                    <ul class="mb-3">
+                        <li>Supprimer les <strong th:text="${invoiceCount}">0</strong> facture(s) archivée(s)
+                            <span class="text-muted">(fichiers PDF dans Google Drive + lignes dans la base)</span></li>
+                        <li>Supprimer les dossiers Drive <code>année/mois</code> s'ils sont vides après nettoyage</li>
+                        <li>Purger l'historique des traitements précédents</li>
+                    </ul>
+                    <p class="mb-0 small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>Conservés</strong> : tes identifiants Google, le dossier Drive racine,
+                        tes mappings expéditeurs/fournisseurs, et l'historique des scans.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <form method="post" th:action="@{/process/reset}" class="d-inline">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i>Confirmer la suppression
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</section>
+</body>
+</html>

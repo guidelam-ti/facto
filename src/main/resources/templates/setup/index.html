@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Configuration</title>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-gear-fill text-primary me-2"></i>Configuration
+        </h1>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success d-flex align-items-center" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <span th:text="${success}">Succès</span>
+    </div>
+    <div th:if="${info}" class="alert alert-info d-flex align-items-center" role="alert">
+        <i class="bi bi-info-circle-fill me-2"></i>
+        <span th:text="${info}">Info</span>
+    </div>
+    <div th:if="${error}" class="alert alert-danger d-flex align-items-center" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <span th:text="${error}">Erreur</span>
+    </div>
+
+    <ol class="mb-4 ps-3 text-muted small">
+        <li>Saisir le <code>client_id</code> et le <code>client_secret</code> obtenus sur Google Cloud Console.</li>
+        <li>Cliquer sur <strong>Connecter mon compte Google</strong>, autoriser sur Google.</li>
+        <li>Choisir le dossier Drive racine d'archivage où les factures seront classées par année/mois.</li>
+    </ol>
+
+    <div class="row g-4">
+
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-key-fill text-secondary me-2"></i>1. Identifiants Google API
+                    </h2>
+                    <p class="text-muted small mb-3">
+                        Issus du client OAuth 2.0 de type <em>Web application</em>.
+                        Stockés en clair dans <code>~/.facto/db/</code> (Phase 1).
+                    </p>
+
+                    <form method="post" th:action="@{/setup}" th:object="${form}" novalidate>
+
+                        <div class="mb-3">
+                            <label for="clientId" class="form-label">Client ID</label>
+                            <input type="text" id="clientId" th:field="*{clientId}"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('clientId')} ? 'is-invalid'"
+                                   placeholder="xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+                                   autocomplete="off">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('clientId')}"
+                                 th:errors="*{clientId}">Erreur</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientSecret" class="form-label">Client Secret</label>
+                            <input type="password" id="clientSecret" th:field="*{clientSecret}"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('clientSecret')} ? 'is-invalid'"
+                                   placeholder="GOCSPX-..."
+                                   autocomplete="off">
+                            <div class="invalid-feedback" th:if="${#fields.hasErrors('clientSecret')}"
+                                 th:errors="*{clientSecret}">Erreur</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i>Enregistrer
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-body d-flex flex-column">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-google text-secondary me-2"></i>2. Connexion au compte Google
+                    </h2>
+
+                    <div th:if="${authorized}" class="alert alert-success d-flex align-items-center mb-3" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <div>
+                            <strong>Connecté.</strong>
+                            <div class="small">Tokens d'accès et de rafraîchissement persistés.</div>
+                        </div>
+                    </div>
+
+                    <div th:unless="${authorized}" class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                        <i class="bi bi-exclamation-circle-fill me-2"></i>
+                        <div>
+                            <strong>Non connecté.</strong>
+                            <div class="small">Aucun token Google enregistré.</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto d-flex flex-wrap gap-2">
+                        <a th:href="@{/setup/connect}"
+                           class="btn btn-success"
+                           th:classappend="${!credentialsConfigured} ? 'disabled'">
+                            <i class="bi bi-link-45deg me-1"></i>
+                            <span th:if="${authorized}">Reconnecter</span>
+                            <span th:unless="${authorized}">Connecter mon compte Google</span>
+                        </a>
+
+                        <form th:if="${authorized}" method="post" th:action="@{/setup/disconnect}" class="d-inline">
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="bi bi-x-circle me-1"></i>Déconnecter
+                            </button>
+                        </form>
+                    </div>
+
+                    <p th:unless="${credentialsConfigured}" class="small text-muted mt-2 mb-0">
+                        <i class="bi bi-info-circle me-1"></i>Saisis d'abord les identifiants ci-contre.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h2 class="h5 card-title">
+                        <i class="bi bi-folder2-open text-secondary me-2"></i>3. Dossier Drive d'archivage
+                    </h2>
+                    <p class="text-muted small mb-3">
+                        Dossier racine de Google Drive dans lequel les factures seront classées par
+                        <code>année/MM-mois/</code>.
+                    </p>
+
+                    <div th:if="${driveFolderId != null and !#strings.isEmpty(driveFolderId)}"
+                         class="alert alert-success d-flex align-items-center mb-3" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <div class="flex-grow-1">
+                            <strong>Sélectionné :</strong>
+                            <span th:text="${driveFolderName}">nom du dossier</span>
+                            <div class="small text-muted">ID : <code th:text="${driveFolderId}">id</code></div>
+                        </div>
+                    </div>
+
+                    <div th:unless="${driveFolderId != null and !#strings.isEmpty(driveFolderId)}"
+                         class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                        <i class="bi bi-exclamation-circle-fill me-2"></i>
+                        <span>Aucun dossier Drive sélectionné.</span>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <a th:href="@{/setup/drive}" href="/setup/drive"
+                           class="btn btn-primary"
+                           th:classappend="${!authorized} ? 'disabled'">
+                            <i class="bi bi-folder-symlink me-1"></i>
+                            <span th:if="${driveFolderId != null and !#strings.isEmpty(driveFolderId)}">Changer le dossier</span>
+                            <span th:unless="${driveFolderId != null and !#strings.isEmpty(driveFolderId)}">Choisir un dossier</span>
+                        </a>
+
+                        <form th:if="${driveFolderId != null and !#strings.isEmpty(driveFolderId)}"
+                              method="post" th:action="@{/setup/drive/clear}" class="d-inline">
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i>Effacer la sélection
+                            </button>
+                        </form>
+                    </div>
+
+                    <p th:unless="${authorized}" class="small text-muted mt-2 mb-0">
+                        <i class="bi bi-info-circle me-1"></i>Connecte ton compte Google ci-dessus avant de choisir un dossier.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</section>
+</body>
+</html>

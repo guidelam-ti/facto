@@ -1,0 +1,26 @@
+:root {
+    --bs-body-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --bs-body-font-size: 0.95rem;
+}
+
+body {
+    font-family: var(--bs-body-font-family);
+    background-color: #f6f7fb;
+}
+
+.app-navbar {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.075);
+    background-color: #fff;
+}
+
+.app-footer {
+    color: #6c757d;
+    font-size: 0.85rem;
+    padding: 1.25rem 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.075);
+    background-color: #fff;
+}
+
+main.app-content {
+    padding: 2rem 0;
+}
