@@ -28,15 +28,25 @@ public class SupplierController {
 
     @GetMapping
     public String list(Model model) {
-        List<SupplierMapping> pending = mappingRepository
-                .findBySupplierIsNullAndIgnoredFalseOrderByMessageCountDescEmailAddressAsc();
+        List<SupplierMapping> allMappings = mappingRepository.findAllWithSupplier();
 
-        List<SupplierMapping> decided = mappingRepository.findDecidedWithSupplier();
+        long pendingCount = allMappings.stream()
+                .filter(m -> m.getSupplier() == null && !m.isIgnored())
+                .count();
+        long mappedCount = allMappings.stream()
+                .filter(m -> m.getSupplier() != null)
+                .count();
+        long ignoredCount = allMappings.stream()
+                .filter(m -> m.getSupplier() == null && m.isIgnored())
+                .count();
 
         List<Supplier> allSuppliers = supplierRepository.findAllByOrderByDisplayNameAsc();
 
-        model.addAttribute("pendingMappings", pending);
-        model.addAttribute("decidedMappings", decided);
+        model.addAttribute("allMappings", allMappings);
+        model.addAttribute("totalCount", allMappings.size());
+        model.addAttribute("pendingCount", pendingCount);
+        model.addAttribute("mappedCount", mappedCount);
+        model.addAttribute("ignoredCount", ignoredCount);
         model.addAttribute("allSuppliers", allSuppliers);
         model.addAttribute("decisionForm", new SupplierDecisionForm());
         return "supplier/list";

@@ -35,4 +35,15 @@ public interface SupplierMappingRepository extends JpaRepository<SupplierMapping
             "WHERE m.supplier IS NOT NULL OR m.ignored = TRUE " +
             "ORDER BY m.messageCount DESC, m.emailAddress ASC")
     List<SupplierMapping> findDecidedWithSupplier();
+
+    /**
+     * Returns every mapping with the {@code supplier} association eagerly fetched
+     * so Thymeleaf can dereference {@code m.supplier.displayName} after the session
+     * is closed (open-in-view stays disabled). Default order matches the previous
+     * pending-first listing: most-frequent senders first, then alphabetical.
+     */
+    @Query("SELECT m FROM SupplierMapping m " +
+            "LEFT JOIN FETCH m.supplier " +
+            "ORDER BY m.messageCount DESC, m.emailAddress ASC")
+    List<SupplierMapping> findAllWithSupplier();
 }

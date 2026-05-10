@@ -50,6 +50,11 @@ public class SupplierService {
                 mapping.setIgnored(true);
                 yield true;
             }
+            case "reset" -> {
+                mapping.setSupplier(null);
+                mapping.setIgnored(false);
+                yield true;
+            }
             case "create" -> {
                 if (newName == null || newName.isBlank()) {
                     log.warn("Skip 'create' decision for mapping {}: empty supplier name", mapping.getId());
