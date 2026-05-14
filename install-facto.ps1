@@ -25,7 +25,8 @@
 [CmdletBinding()]
 param(
     [switch]$NoStart,
-    [switch]$Elevated  # interne : marqueur signalant qu'on tourne deja en mode eleve
+    [switch]$Elevated,           # interne : marqueur signalant qu'on tourne deja en mode eleve
+    [string]$PgPassword = '123456' # mot de passe de l'utilisateur PostgreSQL 'postgres'
 )
 
 Set-StrictMode -Version Latest
@@ -53,7 +54,8 @@ if (-not $isAdmin) {
 
     $argList = @('-NoProfile', '-NoExit', '-ExecutionPolicy', 'Bypass',
                  '-File', "`"$PSCommandPath`"",
-                 '-Elevated')
+                 '-Elevated',
+                 '-PgPassword', "`"$PgPassword`"")
     if ($NoStart) { $argList += '-NoStart' }
 
     try {
@@ -198,75 +200,24 @@ if ($systemJava) {
 }
 
 # ---------------------------------------------------------------
-# Etape 2/8 : PostgreSQL — service, mot de passe, base 'facto'
+# Etape 2/8 : Sanity check du service PostgreSQL
 # ---------------------------------------------------------------
+# Precondition assumee : PG service tourne sur localhost:5432, utilisateur
+# 'postgres', mot de passe = $PgPassword, base 'facto' existe deja.
+# (Defaults raisonnables pour le contexte personnel ; overridables via
+#  install-facto.ps1 -PgPassword 'autrepwd'.)
 $pgService = Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $pgService) {
     Write-Host ""
     Write-Host "[2/8] Aucun service PostgreSQL detecte." -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Facto utilise PostgreSQL comme base de donnees. Installer d'abord le service" -ForegroundColor Yellow
-    Write-Host "depuis : https://www.postgresql.org/download/windows/" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "Installer le service depuis https://www.postgresql.org/download/windows/" -ForegroundColor Yellow
+    Write-Host "puis creer la base : psql -U postgres -c `"CREATE DATABASE facto`""        -ForegroundColor Yellow
     Read-Host "Appuie sur Entree pour fermer"
     exit 1
 }
-
 $psqlExe = Find-Psql
-if (-not $psqlExe) {
-    Write-Host ""
-    Write-Host "[2/8] Service PG detecte mais psql.exe introuvable sous C:\Program Files\PostgreSQL\." -ForegroundColor Red
-    Write-Host "L'installation de PostgreSQL est probablement incomplete."                              -ForegroundColor Yellow
-    Read-Host "Appuie sur Entree pour fermer"
-    exit 1
-}
-
 Write-Host "[2/8] Service PG detecte : $($pgService.Name) ($($pgService.Status))"
-Write-Host "      psql : $psqlExe"
-
-# Boucle saisie password + test connexion (3 tentatives max).
-$pgPwdPlain = ''
-$pgOk       = $false
-$maxAttempts = 3
-for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-    Write-Host ""
-    Write-Host "Saisis le mot de passe de l'utilisateur PostgreSQL 'postgres' (saisie masquee)."
-    $pgPwdSecure = Read-Host -Prompt "Mot de passe PG ($attempt/$maxAttempts)" -AsSecureString
-    $pgPwdPlain  = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pgPwdSecure)
-    )
-    $test = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
-                        -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-d','postgres','-tA','-c','SELECT 1')
-    if ($test.ExitCode -eq 0 -and $test.Output -match '^\s*1\s*$') {
-        Write-Host "      Connexion PG OK." -ForegroundColor Green
-        $pgOk = $true
-        break
-    }
-    Write-Host "      Connexion echouee : $($test.Output.Trim())" -ForegroundColor Red
-}
-if (-not $pgOk) {
-    Read-Host "Trop de tentatives. Appuie sur Entree pour fermer"
-    exit 1
-}
-
-# Verifier que la base 'facto' existe ; la creer sinon.
-$dbCheck = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
-                       -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-tA','-c',
-                                   "SELECT 1 FROM pg_database WHERE datname = 'facto'")
-if ($dbCheck.ExitCode -eq 0 -and $dbCheck.Output -match '^\s*1\s*$') {
-    Write-Host "      Base 'facto' deja presente."
-} else {
-    Write-Host "      Base 'facto' absente, creation..."
-    $create = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
-                          -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-c','CREATE DATABASE facto')
-    if ($create.ExitCode -ne 0) {
-        Write-Host "Echec CREATE DATABASE : $($create.Output)" -ForegroundColor Red
-        Read-Host "Appuie sur Entree pour fermer"
-        exit 1
-    }
-    Write-Host "      Base 'facto' creee." -ForegroundColor Green
-}
-Write-Host ""
+if ($psqlExe) { Write-Host "      psql disponible : $psqlExe" }
 
 # ---------------------------------------------------------------
 # Etape 3/8 : Creer C:\facto et accorder les droits a l'utilisateur
@@ -292,7 +243,7 @@ if (-not (Test-Path $cfgDir)) {
 $cfgLines = @(
     '# Genere par install-facto.ps1 - NE PAS COMMITER',
     '# Surcharge appliquee via -Dspring.config.additional-location=file:C:/facto/config/',
-    "spring.datasource.password=$pgPwdPlain"
+    "spring.datasource.password=$PgPassword"
 )
 Set-Content -Path $cfgFile -Value $cfgLines -Encoding UTF8
 # Restreindre l'acces au seul utilisateur cible (le fichier contient un mot de passe en clair).
@@ -352,15 +303,19 @@ if (-not (Test-Path $h2File)) {
     # 3) Wiper le schema public de la base 'facto' (idempotent : Hibernate le
     #    recreera au boot du jar de migration). Couvre le cas d'un re-run apres
     #    une migration partielle ; en premiere install la base est deja vide.
-    $wipe = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
-                        -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-d','facto','-c',
-                                    'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
-    if ($wipe.ExitCode -ne 0) {
-        Write-Host "      Echec du nettoyage du schema PG : $($wipe.Output)" -ForegroundColor Red
-        Read-Host "Appuie sur Entree pour fermer"
-        exit 1
+    if ($psqlExe) {
+        $wipe = Invoke-Psql -PsqlExe $psqlExe -Password $PgPassword `
+                            -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-d','facto','-c',
+                                        'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
+        if ($wipe.ExitCode -ne 0) {
+            Write-Host "      Echec du nettoyage du schema PG : $($wipe.Output)" -ForegroundColor Red
+            Read-Host "Appuie sur Entree pour fermer"
+            exit 1
+        }
+        Write-Host "      Schema PG nettoye, pret pour migration."
+    } else {
+        Write-Host "      psql introuvable, wipe ignore (premier install : OK ; re-run : risque FK)." -ForegroundColor Yellow
     }
-    Write-Host "      Schema PG nettoye, pret pour migration."
 
     # 4) Copier le jar de migration dans l'install dir (supprime ensuite).
     $dstMigJar = Join-Path $InstallDir 'facto-migration.jar'

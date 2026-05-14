@@ -146,12 +146,13 @@ facto - installation
 ====================
 
 Prerequis : PostgreSQL doit deja etre installe en service sur Windows
-            (https://www.postgresql.org/download/windows/) et une base nommee
-            'facto' doit exister. Si ce n'est pas le cas, ouvrir une console
-            admin et lancer :
-                psql -U postgres -c "CREATE DATABASE facto"
-            L'installeur facto demandera ensuite le mot de passe de l'utilisateur
-            'postgres' pour pouvoir s'y connecter.
+            (https://www.postgresql.org/download/windows/) avec :
+              - port 5432 (defaut)
+              - utilisateur postgres / mot de passe '123456'
+              - base 'facto' creee :
+                    psql -U postgres -c "CREATE DATABASE facto"
+            Si le mot de passe est different, relancer l'installeur avec :
+                .\install-facto.ps1 -PgPassword 'votre-mot-de-passe'
 
 1. Copier ce dossier complet sur ton disque (Bureau, Documents, ...).
 2. Clic droit sur "install-facto.ps1" -> "Executer avec PowerShell".
@@ -163,8 +164,7 @@ Prerequis : PostgreSQL doit deja etre installe en service sur Windows
    au moment de la creation. L'application elle-meme tournera ensuite sans admin.
 
 Ce que fait l'installeur :
-   - Detecte le service PostgreSQL, demande le mot de passe de 'postgres' et
-     cree la base 'facto' si elle n'existe pas encore.
+   - Detecte le service PostgreSQL (sanity check).
    - Verifie si Java 21+ est deja installe sur le systeme. Si oui, l'utilise.
      Sinon, copie le JDK 21 portable fourni dans le zip.
    - Cree le dossier C:\facto et y place : JDK (le cas echeant), facto.jar,
