@@ -120,6 +120,39 @@ function Invoke-NativeForOutput {
     }
 }
 
+# Localise psql.exe livre par l'installeur officiel PostgreSQL (C:\Program Files\PostgreSQL\<ver>\bin\).
+function Find-Psql {
+    $root = 'C:\Program Files\PostgreSQL'
+    if (-not (Test-Path $root)) { return $null }
+    $hit = Get-ChildItem -Path $root -Filter 'psql.exe' -Recurse -ErrorAction SilentlyContinue |
+           Sort-Object FullName -Descending |
+           Select-Object -First 1
+    if ($hit) { return $hit.FullName }
+    return $null
+}
+
+# Lance psql avec un password fourni via PGPASSWORD ; retourne ExitCode + Output combine stdout/stderr.
+function Invoke-Psql {
+    param(
+        [Parameter(Mandatory)] [string]   $PsqlExe,
+        [Parameter(Mandatory)] [string]   $Password,
+        [Parameter(Mandatory)] [string[]] $PsqlArgs
+    )
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $env:PGPASSWORD = $Password
+    try {
+        $lines = & $PsqlExe @PsqlArgs 2>&1 | ForEach-Object { "$_" }
+        return [PSCustomObject]@{
+            ExitCode = $LASTEXITCODE
+            Output   = ($lines -join "`n")
+        }
+    } finally {
+        Remove-Item env:PGPASSWORD -ErrorAction SilentlyContinue
+        $ErrorActionPreference = $prev
+    }
+}
+
 # ---------------------------------------------------------------
 # Etape 1/8 : Detecter une version de Java >= 21 deja installee
 # ---------------------------------------------------------------
@@ -148,6 +181,7 @@ function Find-SystemJava {
 $systemJava = Find-SystemJava
 $useBundledJdk = $true
 $javawPath = $null
+$javaExe   = $null
 
 if ($systemJava) {
     Write-Host "[1/8] Java $($systemJava.Major) detecte sur le systeme :"
@@ -155,6 +189,7 @@ if ($systemJava) {
     Write-Host "      Le JDK fourni dans le zip ne sera PAS copie."
     $useBundledJdk = $false
     $javawPath = $systemJava.Javaw
+    $javaExe   = $systemJava.Java
 } else {
     if (-not (Test-Path $srcJdk -PathType Container)) {
         throw "Aucun Java 21+ detecte sur le systeme et le JDK 'jdk-21' est absent du zip ($srcDir)."
@@ -163,7 +198,7 @@ if ($systemJava) {
 }
 
 # ---------------------------------------------------------------
-# Etape 2/8 : Detecter le service PostgreSQL et collecter le mot de passe
+# Etape 2/8 : PostgreSQL — service, mot de passe, base 'facto'
 # ---------------------------------------------------------------
 $pgService = Get-Service -Name 'postgresql*' -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $pgService) {
@@ -173,21 +208,64 @@ if (-not $pgService) {
     Write-Host "Facto utilise PostgreSQL comme base de donnees. Installer d'abord le service" -ForegroundColor Yellow
     Write-Host "depuis : https://www.postgresql.org/download/windows/" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "Apres installation, creer la base 'facto' :"                                   -ForegroundColor Yellow
-    Write-Host "    psql -U postgres -c `"CREATE DATABASE facto`""                              -ForegroundColor Yellow
+    Read-Host "Appuie sur Entree pour fermer"
+    exit 1
+}
+
+$psqlExe = Find-Psql
+if (-not $psqlExe) {
     Write-Host ""
+    Write-Host "[2/8] Service PG detecte mais psql.exe introuvable sous C:\Program Files\PostgreSQL\." -ForegroundColor Red
+    Write-Host "L'installation de PostgreSQL est probablement incomplete."                              -ForegroundColor Yellow
     Read-Host "Appuie sur Entree pour fermer"
     exit 1
 }
 
 Write-Host "[2/8] Service PG detecte : $($pgService.Name) ($($pgService.Status))"
-Write-Host ""
-Write-Host "Saisis le mot de passe de l'utilisateur PostgreSQL 'postgres'."
-Write-Host "(Laisse vide si pas de mot de passe configure ; saisie masquee.)"
-$pgPwdSecure = Read-Host -Prompt "Mot de passe PG" -AsSecureString
-$pgPwdPlain  = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-    [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pgPwdSecure)
-)
+Write-Host "      psql : $psqlExe"
+
+# Boucle saisie password + test connexion (3 tentatives max).
+$pgPwdPlain = ''
+$pgOk       = $false
+$maxAttempts = 3
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+    Write-Host ""
+    Write-Host "Saisis le mot de passe de l'utilisateur PostgreSQL 'postgres' (saisie masquee)."
+    $pgPwdSecure = Read-Host -Prompt "Mot de passe PG ($attempt/$maxAttempts)" -AsSecureString
+    $pgPwdPlain  = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+        [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($pgPwdSecure)
+    )
+    $test = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
+                        -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-d','postgres','-tA','-c','SELECT 1')
+    if ($test.ExitCode -eq 0 -and $test.Output -match '^\s*1\s*$') {
+        Write-Host "      Connexion PG OK." -ForegroundColor Green
+        $pgOk = $true
+        break
+    }
+    Write-Host "      Connexion echouee : $($test.Output.Trim())" -ForegroundColor Red
+}
+if (-not $pgOk) {
+    Read-Host "Trop de tentatives. Appuie sur Entree pour fermer"
+    exit 1
+}
+
+# Verifier que la base 'facto' existe ; la creer sinon.
+$dbCheck = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
+                       -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-tA','-c',
+                                   "SELECT 1 FROM pg_database WHERE datname = 'facto'")
+if ($dbCheck.ExitCode -eq 0 -and $dbCheck.Output -match '^\s*1\s*$') {
+    Write-Host "      Base 'facto' deja presente."
+} else {
+    Write-Host "      Base 'facto' absente, creation..."
+    $create = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
+                          -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-c','CREATE DATABASE facto')
+    if ($create.ExitCode -ne 0) {
+        Write-Host "Echec CREATE DATABASE : $($create.Output)" -ForegroundColor Red
+        Read-Host "Appuie sur Entree pour fermer"
+        exit 1
+    }
+    Write-Host "      Base 'facto' creee." -ForegroundColor Green
+}
 Write-Host ""
 
 # ---------------------------------------------------------------
@@ -246,15 +324,91 @@ if ($useBundledJdk) {
 }
 
 # ---------------------------------------------------------------
-# Etape 6/8 : Copier le JAR (renomme en facto.jar pour stabilite)
+# Etape 6/8 : Migrer une eventuelle base H2 existante (upgrade depuis ancien install)
+# ---------------------------------------------------------------
+$h2File           = Join-Path $InstallDir 'db\facto.mv.db'
+$srcMigrationJar  = Join-Path $srcDir 'facto-migration.jar'
+
+if (-not (Test-Path $h2File)) {
+    Write-Host "[6/8] Pas de base H2 a migrer (premiere installation ou deja migre)."
+} elseif (-not (Test-Path $srcMigrationJar)) {
+    Write-Warning "[6/8] H2 detectee ($h2File) mais facto-migration.jar absent du zip ; migration ignoree."
+} else {
+    Write-Host "[6/8] Base H2 existante detectee, migration H2 -> PostgreSQL en cours..." -ForegroundColor Yellow
+
+    # 1) Arreter une instance facto en cours qui tiendrait le verrou sur le .mv.db.
+    $running = Get-CimInstance Win32_Process -Filter "Name = 'javaw.exe'" -ErrorAction SilentlyContinue |
+               Where-Object { $_.CommandLine -and $_.CommandLine.Contains('facto.jar') }
+    foreach ($p in $running) {
+        Write-Host "      Arret du facto en cours (PID $($p.ProcessId))..."
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($running) { Start-Sleep -Seconds 2 }
+
+    # 2) Backup defensif du fichier H2.
+    Copy-Item -Path $h2File -Destination "$h2File.backup" -Force
+    Write-Host "      Backup cree : $h2File.backup"
+
+    # 3) Wiper le schema public de la base 'facto' (idempotent : Hibernate le
+    #    recreera au boot du jar de migration). Couvre le cas d'un re-run apres
+    #    une migration partielle ; en premiere install la base est deja vide.
+    $wipe = Invoke-Psql -PsqlExe $psqlExe -Password $pgPwdPlain `
+                        -PsqlArgs @('-U','postgres','-h','localhost','-p','5432','-d','facto','-c',
+                                    'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;')
+    if ($wipe.ExitCode -ne 0) {
+        Write-Host "      Echec du nettoyage du schema PG : $($wipe.Output)" -ForegroundColor Red
+        Read-Host "Appuie sur Entree pour fermer"
+        exit 1
+    }
+    Write-Host "      Schema PG nettoye, pret pour migration."
+
+    # 4) Copier le jar de migration dans l'install dir (supprime ensuite).
+    $dstMigJar = Join-Path $InstallDir 'facto-migration.jar'
+    Copy-Item -Path $srcMigrationJar -Destination $dstMigJar -Force
+
+    # 5) Lancer la migration : profils postgres,migrate-h2 + URL H2 + config additionnelle.
+    $h2Url   = 'jdbc:h2:file:' + ($InstallDir -replace '\\','/') + '/db/facto;ACCESS_MODE_DATA=r;IFEXISTS=TRUE;AUTO_SERVER=FALSE'
+    $cfgLoc  = 'file:' + ($InstallDir -replace '\\','/') + '/config/'
+    $env:SPRING_PROFILES_ACTIVE   = 'postgres,migrate-h2'
+    $env:SPRING_DATASOURCE_USERNAME = 'postgres'
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $javaExe `
+            "-Dspring.config.additional-location=$cfgLoc" `
+            "-Dfacto.migrate.h2.url=$h2Url" `
+            '-jar' $dstMigJar
+        $rc = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEAP
+        Remove-Item env:SPRING_PROFILES_ACTIVE   -ErrorAction SilentlyContinue
+        Remove-Item env:SPRING_DATASOURCE_USERNAME -ErrorAction SilentlyContinue
+    }
+
+    # 6) Nettoyage du jar de migration.
+    Remove-Item -Path $dstMigJar -Force -ErrorAction SilentlyContinue
+
+    if ($rc -ne 0) {
+        Write-Host "      Migration ECHOUEE (exit $rc). Le fichier H2 est intact ($h2File)." -ForegroundColor Red
+        Write-Host "      Installation interrompue. Verifier les logs ci-dessus."             -ForegroundColor Red
+        Read-Host "Appuie sur Entree pour fermer"
+        exit 1
+    }
+
+    # 7) Renommer le .mv.db pour ne pas re-migrer au prochain lancement de l'installeur.
+    Move-Item -Path $h2File -Destination "$h2File.migrated" -Force
+    $traceFile = Join-Path $InstallDir 'db\facto.trace.db'
+    if (Test-Path $traceFile) { Remove-Item -Path $traceFile -Force -ErrorAction SilentlyContinue }
+    Write-Host "      Migration OK. Fichier H2 renomme : $h2File.migrated" -ForegroundColor Green
+}
+
+# ---------------------------------------------------------------
+# Etape 7/8 : Copier le JAR + generer le launcher PowerShell
 # ---------------------------------------------------------------
 $dstJar = Join-Path $InstallDir 'facto.jar'
 Copy-Item -Path $srcJar.FullName -Destination $dstJar -Force
-Write-Host "[6/8] JAR copie : $dstJar"
+Write-Host "[7/8] JAR copie : $dstJar"
 
-# ---------------------------------------------------------------
-# Etape 7/8 : Generer le launcher PowerShell
-# ---------------------------------------------------------------
 $launcherPath = Join-Path $InstallDir 'launch-facto.ps1'
 
 # Template du launcher : here-string SINGLE-quoted pour que rien ne soit
@@ -435,7 +589,7 @@ while ($true) {
 
 $launcherContent = $launcherTemplate.Replace('__INSTALL_DIR__', $InstallDir).Replace('__JAVA_PATH__', $javawPath)
 Set-Content -Path $launcherPath -Value $launcherContent -Encoding UTF8
-Write-Host "[7/8] Launcher genere : $launcherPath"
+Write-Host "      Launcher genere : $launcherPath"
 
 # ---------------------------------------------------------------
 # Etape 8/8 : Raccourci bureau + tache planifiee
@@ -449,7 +603,7 @@ $shortcut.IconLocation     = "$javawPath,0"
 $shortcut.Description      = "Lancer $AppName et ouvrir le navigateur"
 $shortcut.WindowStyle      = 1   # Normale (fenetre visible avec progression)
 $shortcut.Save()
-Write-Host "      Raccourci bureau cree : $DesktopShortcut"
+Write-Host "[8/8] Raccourci bureau cree : $DesktopShortcut"
 
 # --- Tache planifiee au logon ---
 $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
