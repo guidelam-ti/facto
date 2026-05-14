@@ -217,7 +217,10 @@ $launcherPath = Join-Path $InstallDir 'launch-facto.ps1'
 $launcherTemplate = @'
 # launch-facto.ps1 (genere par install-facto.ps1)
 # Lance facto si elle ne tourne pas deja, puis ouvre le navigateur.
-# Avec -Silent : demarre seulement, n'ouvre pas le navigateur.
+#
+# Mode normal : fenetre console visible qui affiche les etapes de demarrage
+#               (parse facto.log pour detecter les milestones Spring Boot).
+# Mode -Silent (tache planifiee au logon) : start-and-go, aucune fenetre.
 
 param([switch]$Silent)
 $ErrorActionPreference = 'SilentlyContinue'
@@ -225,15 +228,30 @@ $ErrorActionPreference = 'SilentlyContinue'
 $installDir = '__INSTALL_DIR__'
 $java       = '__JAVA_PATH__'
 $jar        = Join-Path $installDir 'facto.jar'
+$logFile    = Join-Path $installDir 'logs\facto.log'
 $url        = 'http://localhost:8080'
 
 function Test-AppRunning {
     try {
         $null = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 1 -ErrorAction Stop
         return $true
-    } catch {
-        return $false
-    }
+    } catch { return $false }
+}
+
+# Lit le log a partir d'un offset, en partage ReadWrite (le fichier est en cours
+# d'ecriture par Java). Retourne '' si le fichier n'existe pas encore ou erreur.
+function Read-LogTail {
+    param([string]$Path, [int64]$FromOffset)
+    if (-not (Test-Path $Path)) { return '' }
+    try {
+        $fs = [System.IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
+        try {
+            if ($fs.Length -le $FromOffset) { return '' }
+            $fs.Position = $FromOffset
+            $reader = New-Object System.IO.StreamReader($fs)
+            return $reader.ReadToEnd()
+        } finally { $fs.Close() }
+    } catch { return '' }
 }
 
 if (-not (Test-Path $java)) {
@@ -244,20 +262,127 @@ if (-not (Test-Path $java)) {
     exit 1
 }
 
-if (-not (Test-AppRunning)) {
-    $jvmArgs = @('-Dfacto.home=__INSTALL_DIR__', '-jar', $jar)
-    Start-Process -FilePath $java -ArgumentList $jvmArgs -WorkingDirectory $installDir -WindowStyle Hidden | Out-Null
-
-    if (-not $Silent) {
-        for ($i = 0; $i -lt 60; $i++) {
-            Start-Sleep -Milliseconds 500
-            if (Test-AppRunning) { break }
-        }
-    }
+# Si Facto tourne deja, on ouvre simplement le navigateur (rien en silent).
+if (Test-AppRunning) {
+    if (-not $Silent) { Start-Process $url }
+    exit 0
 }
 
-if (-not $Silent) {
-    Start-Process $url
+# Memorise la taille actuelle du log AVANT de lancer Java, pour ne detecter
+# que les milestones du nouveau demarrage (le log est append-only).
+$initialLogSize = 0
+if (Test-Path $logFile) { $initialLogSize = (Get-Item $logFile).Length }
+
+# Demarre Java en arriere-plan, sans console.
+$jvmArgs = @("-Dfacto.home=$installDir", '-jar', $jar)
+$javaProc = Start-Process -FilePath $java -ArgumentList $jvmArgs `
+                          -WorkingDirectory $installDir -WindowStyle Hidden -PassThru
+
+if ($Silent) { exit 0 }
+
+# --------------- UI console : etapes de demarrage ---------------
+$steps = @(
+    @{ Pattern = 'Starting FactoApplication';      Label = 'Demarrage du moteur Java' }
+    @{ Pattern = 'Bootstrapping Spring Data JPA';  Label = 'Initialisation de Spring Boot' }
+    @{ Pattern = 'HikariPool-1 - Start completed'; Label = 'Connexion a la base de donnees' }
+    @{ Pattern = 'Tomcat started on port';         Label = 'Serveur web operationnel' }
+    @{ Pattern = 'Started FactoApplication';       Label = 'Facto prete' }
+)
+$stepDone = @{}
+foreach ($s in $steps) { $stepDone[$s.Pattern] = $false }
+
+$Host.UI.RawUI.WindowTitle = 'Facto - Demarrage'
+try { [Console]::CursorVisible = $false } catch {}
+Clear-Host
+Write-Host ''
+Write-Host '  ==================================================' -ForegroundColor Cyan
+Write-Host '    Demarrage de Facto'                                -ForegroundColor Cyan
+Write-Host '  ==================================================' -ForegroundColor Cyan
+Write-Host ''
+$stepLineStart = [Console]::CursorTop
+foreach ($s in $steps) {
+    Write-Host ('    [...]   ' + $s.Label) -ForegroundColor DarkGray
+}
+Write-Host ''
+$statusLineY = [Console]::CursorTop
+Write-Host ''  # reserve la ligne de statut
+Write-Host ''
+Write-Host '    Le navigateur s''ouvrira automatiquement des que Facto est prete.' -ForegroundColor DarkGray
+
+function Write-Step {
+    param([int]$Index, [string]$Marker, [string]$Label, [System.ConsoleColor]$Color)
+    [Console]::SetCursorPosition(0, $script:stepLineStart + $Index)
+    $line = '    [' + $Marker + ']   ' + $Label
+    if ($line.Length -lt 70) { $line = $line + (' ' * (70 - $line.Length)) }
+    Write-Host $line -ForegroundColor $Color
+}
+
+function Write-Status {
+    param([string]$Text, [System.ConsoleColor]$Color = [System.ConsoleColor]::Yellow)
+    [Console]::SetCursorPosition(0, $script:statusLineY)
+    if ($Text.Length -lt 70) { $Text = $Text + (' ' * (70 - $Text.Length)) }
+    Write-Host $Text -ForegroundColor $Color
+}
+
+$startTime = Get-Date
+$maxWaitSeconds = 120
+
+while ($true) {
+    $elapsed = [int]((Get-Date) - $startTime).TotalSeconds
+
+    # Detection des milestones via lecture incrementale du log
+    $logTail = Read-LogTail -Path $logFile -FromOffset $initialLogSize
+    if ($logTail) {
+        for ($i = 0; $i -lt $steps.Length; $i++) {
+            $s = $steps[$i]
+            if (-not $stepDone[$s.Pattern] -and $logTail.Contains($s.Pattern)) {
+                $stepDone[$s.Pattern] = $true
+                Write-Step -Index $i -Marker 'OK' -Label $s.Label -Color Green
+            }
+        }
+    }
+
+    Write-Status "    Demarrage en cours depuis $elapsed s..."
+
+    # App prete ?
+    if (Test-AppRunning) {
+        for ($i = 0; $i -lt $steps.Length; $i++) {
+            $s = $steps[$i]
+            if (-not $stepDone[$s.Pattern]) {
+                $stepDone[$s.Pattern] = $true
+                Write-Step -Index $i -Marker 'OK' -Label $s.Label -Color Green
+            }
+        }
+        Write-Status "    Facto prete en $elapsed s. Ouverture du navigateur..." -Color Green
+        Start-Sleep -Milliseconds 800
+        Start-Process $url
+        Start-Sleep -Seconds 2
+        try { [Console]::CursorVisible = $true } catch {}
+        exit 0
+    }
+
+    # Java s'est arrete avant d'etre pret ?
+    if ($javaProc -and $javaProc.HasExited) {
+        Write-Status "    Java s'est arrete (code $($javaProc.ExitCode)). Verifie le log." -Color Red
+        Write-Host ''
+        Write-Host "    Log : $logFile" -ForegroundColor Yellow
+        Write-Host ''
+        try { [Console]::CursorVisible = $true } catch {}
+        Read-Host '    Appuie sur Entree pour fermer'
+        exit 1
+    }
+
+    if ($elapsed -gt $maxWaitSeconds) {
+        Write-Status "    Demarrage > $maxWaitSeconds s, il y a peut-etre un probleme." -Color Red
+        Write-Host ''
+        Write-Host "    Log : $logFile" -ForegroundColor Yellow
+        Write-Host ''
+        try { [Console]::CursorVisible = $true } catch {}
+        Read-Host '    Appuie sur Entree pour fermer'
+        exit 1
+    }
+
+    Start-Sleep -Milliseconds 500
 }
 '@
 
@@ -271,11 +396,11 @@ Write-Host "[5/7] Launcher genere : $launcherPath"
 $wshell  = New-Object -ComObject WScript.Shell
 $shortcut = $wshell.CreateShortcut($DesktopShortcut)
 $shortcut.TargetPath       = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$shortcut.Arguments        = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$launcherPath`""
+$shortcut.Arguments        = "-NoProfile -ExecutionPolicy Bypass -File `"$launcherPath`""
 $shortcut.WorkingDirectory = $InstallDir
 $shortcut.IconLocation     = "$javawPath,0"
 $shortcut.Description      = "Lancer $AppName et ouvrir le navigateur"
-$shortcut.WindowStyle      = 7   # Minimise sans focus
+$shortcut.WindowStyle      = 1   # Normale (fenetre visible avec progression)
 $shortcut.Save()
 Write-Host "[6/7] Raccourci bureau cree : $DesktopShortcut"
 
@@ -339,8 +464,7 @@ if ($NoStart) {
 } else {
     Write-Host "Demarrage de l'application..." -ForegroundColor Cyan
     Start-Process -FilePath (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe') `
-                  -ArgumentList @('-NoProfile','-WindowStyle','Hidden','-ExecutionPolicy','Bypass','-File',"`"$launcherPath`"") `
-                  -WindowStyle Hidden
+                  -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',"`"$launcherPath`"")
 }
 
 Write-Host ""
