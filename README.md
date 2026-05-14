@@ -49,17 +49,19 @@ Pour inspecter la base : `psql -U postgres -d facto` ou via pgAdmin.
 
 ## État du projet
 
-Le projet est livré par **étapes A → G** :
+**Feature-complete.** Le plan initial A→G (squelette, modèle JPA, OAuth Google, choix du dossier Drive, scan Gmail, traitement/archivage, historique/dashboard) est livré. Itérations ultérieures : installeur Windows autonome (`install-facto.ps1` + zip d'expédition via `build-install-zip.ps1`) et bascule de H2 vers PostgreSQL avec migration des données existantes. Détails commit-par-commit dans `git log`.
 
-| Étape | Sujet | État |
-|------|------|------|
-| A | Squelette projet (build, layout, page d'accueil) | **livré** |
-| B | Modèle de données JPA + repositories | à venir |
-| C | OAuth 2.0 Google (Gmail + Drive) | à venir |
-| D | Choix du dossier Drive racine | à venir |
-| E | Scan Gmail + validation des fournisseurs | à venir |
-| F | Traitement + archivage Drive | à venir |
-| G | Historique + dashboard | à venir |
+## Distribution
+
+Pour produire un zip d'install pour une autre machine Windows :
+
+```powershell
+.\build-install-zip.ps1
+```
+
+Sortie : `C:\zzz\workspace\automation\facto-output\facto-install.zip` (~323 Mo : jar courant + jar de migration H2→PG + JDK 21 portable + installeur PowerShell). Le destinataire décompresse, clic droit sur `install-facto.ps1` → "Exécuter avec PowerShell". L'installeur détecte automatiquement une éventuelle base H2 existante et migre les données vers PG sans intervention manuelle.
+
+Prérequis côté destinataire : PostgreSQL service local (port 5432, user `postgres`, password `123456`, base `facto`). Override possible : `.\install-facto.ps1 -PgPassword 'autre-pwd'`.
 
 ## Avertissement sécurité
 

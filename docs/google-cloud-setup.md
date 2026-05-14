@@ -146,7 +146,7 @@ http://localhost:8080/oauth/callback
 ## 🔒 Sécurité
 
 - **Ne jamais committer** `client_id` ni `client_secret` dans Git.
-- Ces valeurs sont persistées dans la table `app_setting` (H2 / fichier local). Le fichier de base de données est dans `.gitignore` (à vérifier dans le projet).
+- Ces valeurs sont persistées dans la table `app_setting` de PostgreSQL local. Le mot de passe de la base lui-même est stocké en clair dans `C:\facto\config\application.properties` (NTFS restreint à l'utilisateur) — voir l'avertissement sécurité du `README.md`.
 - En cas de fuite du `client_secret` : régénérer immédiatement via Google Auth Platform → **Clients** → ouvrir le client → **« RÉINITIALISER LE SECRET »**.
 - L'app reste en mode **Testing** indéfiniment pour usage perso : aucun besoin de soumettre à la vérification Google.
 
