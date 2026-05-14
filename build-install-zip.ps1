@@ -105,6 +105,14 @@ $readme = @"
 facto - installation
 ====================
 
+Prerequis : PostgreSQL doit deja etre installe en service sur Windows
+            (https://www.postgresql.org/download/windows/) et une base nommee
+            'facto' doit exister. Si ce n'est pas le cas, ouvrir une console
+            admin et lancer :
+                psql -U postgres -c "CREATE DATABASE facto"
+            L'installeur facto demandera ensuite le mot de passe de l'utilisateur
+            'postgres' pour pouvoir s'y connecter.
+
 1. Copier ce dossier complet sur ton disque (Bureau, Documents, ...).
 2. Clic droit sur "install-facto.ps1" -> "Executer avec PowerShell".
 3. Si Windows bloque (SmartScreen) : "Plus d'infos" -> "Executer quand meme".
@@ -115,25 +123,29 @@ facto - installation
    au moment de la creation. L'application elle-meme tournera ensuite sans admin.
 
 Ce que fait l'installeur :
+   - Detecte le service PostgreSQL et te demande le mot de passe de 'postgres'.
    - Verifie si Java 21+ est deja installe sur le systeme. Si oui, l'utilise.
      Sinon, copie le JDK 21 portable fourni dans le zip.
    - Cree le dossier C:\facto et y place : JDK (le cas echeant), facto.jar,
-     launch-facto.ps1, et plus tard la base H2 (db\) et les logs (logs\).
+     launch-facto.ps1, config\application.properties (le password PG) et plus
+     tard les logs (logs\).
    - Cree un raccourci "Facto" sur le bureau.
    - Cree une tache planifiee qui demarre l'app a chaque ouverture de session.
    - Lance l'app immediatement et ouvre le navigateur sur http://localhost:8080.
 
-Tout est dans C:\facto, rien ailleurs.
+Tout le runtime est dans C:\facto ; les donnees sont dans la base PG locale.
 
 Logs                  : C:\facto\logs\facto.log
-Base H2 (donnees)     : C:\facto\db\
+Config PG (creds)     : C:\facto\config\application.properties
 Configuration runtime : C:\facto\launch-facto.ps1
+Donnees               : base PostgreSQL 'facto' (service local)
 
 Desinstaller :
    1. Get-ScheduledTask 'Facto Auto-Start' | Unregister-ScheduledTask -Confirm:`$false
    2. Tuer le processus javaw.exe (Gestionnaire des taches, ou: Stop-Process -Name javaw)
    3. Supprimer C:\facto (necessite admin pour supprimer le dossier racine)
    4. Supprimer le raccourci "Facto" du bureau
+   5. (Optionnel) Supprimer la base PG : psql -U postgres -c "DROP DATABASE facto"
 "@
 Set-Content -Path (Join-Path $StagingDir 'README.txt') -Value $readme -Encoding UTF8
 
