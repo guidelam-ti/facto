@@ -9,7 +9,9 @@ import com.guidelam.facto.web.dto.SupplierDecisionForm;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +27,11 @@ public class SupplierController {
     private final SupplierService supplierService;
     private final SupplierRepository supplierRepository;
     private final SupplierMappingRepository mappingRepository;
+
+    @InitBinder("decisionForm")
+    public void initDecisionFormBinder(WebDataBinder binder) {
+        binder.setAutoGrowCollectionLimit(100_000);
+    }
 
     @GetMapping
     public String list(Model model) {

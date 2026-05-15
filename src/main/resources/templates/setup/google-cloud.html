@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Étape 0 — Configuration Google Cloud</title>
+    <style>
+        .markdown-body {
+            line-height: 1.6;
+        }
+        .markdown-body h1 { font-size: 1.75rem; margin-top: 1.5rem; }
+        .markdown-body h2 { font-size: 1.4rem; margin-top: 2rem; padding-bottom: 0.3rem; border-bottom: 1px solid #e5e7eb; }
+        .markdown-body h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+        .markdown-body p, .markdown-body ul, .markdown-body ol { margin-bottom: 1rem; }
+        .markdown-body code {
+            background: #f3f4f6;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #c7254e;
+        }
+        .markdown-body pre {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 0.85rem 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .markdown-body pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        .markdown-body blockquote {
+            border-left: 4px solid #6366f1;
+            background: #eef2ff;
+            padding: 0.5rem 1rem;
+            margin: 1rem 0;
+            color: #1e1b4b;
+        }
+        .markdown-body table {
+            width: 100%;
+            margin-bottom: 1rem;
+            border-collapse: collapse;
+        }
+        .markdown-body th, .markdown-body td {
+            border: 1px solid #d1d5db;
+            padding: 0.5rem 0.75rem;
+            vertical-align: top;
+        }
+        .markdown-body thead th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        .markdown-body hr {
+            margin: 2rem 0;
+        }
+        .markdown-body a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .markdown-body a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<section layout:fragment="content">
+
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-info-circle-fill text-info me-2"></i>Étape 0 — Configuration Google Cloud
+        </h1>
+    </div>
+
+    <div class="alert alert-info d-flex align-items-start" role="alert">
+        <i class="bi bi-lightbulb-fill me-2 mt-1"></i>
+        <div>
+            Ce guide te détaille les manipulations à effectuer dans la console Google Cloud
+            <strong>avant</strong> de pouvoir utiliser <code>facto</code>. À la fin, tu disposeras
+            d'un <code>client_id</code> et d'un <code>client_secret</code> à saisir à l'étape suivante.
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body markdown-body" th:utext="${html}">
+            <p>Contenu du guide…</p>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center">
+        <a th:href="@{/}" class="btn btn-outline-secondary">
+            <i class="bi bi-house me-1"></i>Accueil
+        </a>
+        <a th:href="@{/setup}" class="btn btn-primary">
+            Suivant : saisir les identifiants
+            <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+    </div>
+
+</section>
+</body>
+</html>

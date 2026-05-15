@@ -11,7 +11,7 @@ Application web **locale** (lancée via `java -jar facto.jar`, accessible sur `h
 - Spring Boot 4.0.x — Spring Web, Thymeleaf, Spring Data JPA, validation
 - Thymeleaf 3 + Layout Dialect
 - Bootstrap 5.3 + Bootstrap Icons + police Inter (servis localement, pas de CDN)
-- H2 en mode fichier (`~/.facto/db/`)
+- PostgreSQL (service local Windows par défaut ; URL/creds surchargeables via env vars ou config externe)
 - Pas de Spring Security (app loopback uniquement)
 
 ## Setup initial
@@ -24,38 +24,48 @@ La procédure complète, pas-à-pas, avec dépannage, est dans **[docs/google-cl
 
 ## Démarrage rapide
 
-Prérequis : **Java 21** (JDK 17 ne fonctionne pas avec Spring Boot 4) et le [setup initial](#setup-initial) terminé.
+Prérequis :
+- **Java 21** (JDK 17 ne fonctionne pas avec Spring Boot 4)
+- **PostgreSQL** installé localement avec une base `facto` :
+  ```sh
+  psql -U postgres -c "CREATE DATABASE facto"
+  ```
+- Le [setup initial](#setup-initial) Google Cloud terminé
 
 ```sh
 # Build
 ./mvnw clean package
 
-# Run
-java -jar target/facto-0.1.0-SNAPSHOT.jar
+# Run (les defaults pointent sur jdbc:postgresql://localhost:5432/facto, user postgres).
+# Surcharger via variables d'env si besoin :
+#   SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD
+SPRING_DATASOURCE_PASSWORD=xxx java -jar target/facto-0.1.0-SNAPSHOT.jar
 
 # Open
 http://localhost:8080
 ```
 
-La console H2 (utile en dev) est exposée sur `http://localhost:8080/h2-console` — JDBC URL : `jdbc:h2:file:~/.facto/db/facto;AUTO_SERVER=TRUE`, user `sa`, mot de passe vide.
+Pour inspecter la base : `psql -U postgres -d facto` ou via pgAdmin.
 
 ## État du projet
 
-Le projet est livré par **étapes A → G** :
+**Feature-complete.** Le plan initial A→G (squelette, modèle JPA, OAuth Google, choix du dossier Drive, scan Gmail, traitement/archivage, historique/dashboard) est livré. Itérations ultérieures : installeur Windows autonome (`install-facto.ps1` + zip d'expédition via `build-install-zip.ps1`) et bascule de H2 vers PostgreSQL avec migration des données existantes. Détails commit-par-commit dans `git log`.
 
-| Étape | Sujet | État |
-|------|------|------|
-| A | Squelette projet (build, layout, page d'accueil) | **livré** |
-| B | Modèle de données JPA + repositories | à venir |
-| C | OAuth 2.0 Google (Gmail + Drive) | à venir |
-| D | Choix du dossier Drive racine | à venir |
-| E | Scan Gmail + validation des fournisseurs | à venir |
-| F | Traitement + archivage Drive | à venir |
-| G | Historique + dashboard | à venir |
+## Distribution
+
+Pour produire un zip d'install pour une autre machine Windows :
+
+```powershell
+.\build-install-zip.ps1
+```
+
+Sortie : `C:\zzz\workspace\automation\facto-output\facto-install.zip` (~323 Mo : jar courant + jar de migration H2→PG + JDK 21 portable + installeur PowerShell). Le destinataire décompresse, clic droit sur `install-facto.ps1` → "Exécuter avec PowerShell". L'installeur détecte automatiquement une éventuelle base H2 existante et migre les données vers PG sans intervention manuelle.
+
+Prérequis côté destinataire : PostgreSQL service local (port 5432, user `postgres`, password `123456`, base `facto`). Override possible : `.\install-facto.ps1 -PgPassword 'autre-pwd'`.
 
 ## Avertissement sécurité
 
-À partir de l'étape C, la base H2 (`~/.facto/db/facto.mv.db`) contiendra les tokens OAuth Google en clair. **Ce fichier ne doit pas être partagé ni commité.** Une éventuelle encryption au repos est repoussée à une phase ultérieure.
+La base PostgreSQL contient (table `app_setting`) les tokens OAuth Google en clair. **Ces credentials ne doivent pas être exportés ni partagés.** Le mot de passe PG lui-même est stocké en clair dans `C:\facto\config\application.properties` (généré par l'installeur, NTFS restreint à l'utilisateur). Une éventuelle encryption au repos est repoussée à une phase ultérieure.
 
 ## Spécification complète
 

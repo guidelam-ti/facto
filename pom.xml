@@ -25,6 +25,7 @@
         <google-api-client.version>2.9.0</google-api-client.version>
         <google-gmail.version>v1-rev20260413-2.0.0</google-gmail.version>
         <google-drive.version>v3-rev20260428-2.0.0</google-drive.version>
+        <commonmark.version>0.22.0</commonmark.version>
     </properties>
 
     <dependencies>
@@ -52,13 +53,9 @@
         </dependency>
 
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-h2console</artifactId>
         </dependency>
 
         <dependency>
@@ -91,6 +88,17 @@
         </dependency>
 
         <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-gfm-tables</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
@@ -99,6 +107,18 @@
 
     <build>
         <finalName>${project.artifactId}-${project.version}</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>docs</directory>
+                <targetPath>docs</targetPath>
+                <includes>
+                    <include>**/*.md</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
